@@ -1,0 +1,44 @@
+apply plugin: 'java'
+apply plugin: 'jacoco'
+apply plugin: 'maven'
+
+
+description = 'Quipto java libary'
+repositories {
+    jcenter()
+}
+
+dependencies {
+    compile 'org.apache.commons:commons-compress:1.19'
+    compile 'org.bouncycastle:bcprov-jdk15on:1.60'
+    compile 'org.bouncycastle:bcpg-jdk15on:1.60'
+    compile files('../winselfcert/winselfcert/dist/winselfcert.jar')
+    testCompile 'junit:junit:4.12'
+}
+
+task runAliceBobCharlieGenKeys(type: JavaExec){
+    description = "Create key pairs for composite file demo"
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'org.quipto.compositefile.demo.AliceBobCharlieGenKeys'
+    jvmArgs '-Djava.library.path=..\\winselfcert\\winselfcertdll\\dist\\Release\\Cygwin-Windows'
+}
+
+task runAliceMakeEncryptedTar(type: JavaExec){
+    description = "Demo user Alice creates an encrypted tar file"
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'org.quipto.compositefile.demo.AliceMakeEncryptedTar'
+}
+
+task runBobReadEncryptedTar(type: JavaExec){
+    description = "Demo user Bob reads the file Alice created"
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'org.quipto.compositefile.demo.BobReadEncryptedTar'
+}
+
+task runCharlieReadEncryptedTar(type: JavaExec){
+    description = "Demo user Charlie (who stores his key password using Windows encryption) reads the file Alice created"
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'org.quipto.compositefile.demo.CharlieReadEncryptedTar'
+    jvmArgs '-Djava.library.path=..\\winselfcert\\winselfcertdll\\dist\\Release\\Cygwin-Windows'
+}
+
