@@ -20,12 +20,20 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.InvalidKeyException;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Security;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPPrivateKey;
@@ -42,6 +50,7 @@ public class CharlieReadEncryptedTar
 {
 
   public static char[] readEncryptedPassword( File file ) 
+          throws KeyStoreException
   {
     try
     {
@@ -63,7 +72,7 @@ public class CharlieReadEncryptedTar
       System.out.println( "Password is: " + new String( decrypt, "UTF8" ) );
       return new String( decrypt, "UTF8" ).toCharArray();
     }
-    catch ( Exception e )
+    catch ( IOException | InvalidKeyException | NoSuchAlgorithmException | UnrecoverableKeyException | CertificateException | BadPaddingException | IllegalBlockSizeException | NoSuchPaddingException e )
     {
       e.printStackTrace();
     }
@@ -114,6 +123,10 @@ public class CharlieReadEncryptedTar
       in.close();
       compfile.close();
       System.out.print( "\n\n" );
+    }
+    catch ( KeyStoreException kse )
+    {
+      System.out.println("This demo requires access to the Windows certificate store but it is not available.  Not running on Windows?");
     }
     catch (IOException ex)
     {
