@@ -219,7 +219,6 @@ public class AliceBobCharlieGenKeys
     catch (Exception e)
     {
       System.out.println( "Unable to create Windows password guard." );
-      e.printStackTrace(System.out);
       return null;
     }
 
