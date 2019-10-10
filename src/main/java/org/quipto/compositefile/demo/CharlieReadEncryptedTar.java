@@ -32,6 +32,7 @@ import org.bouncycastle.openpgp.PGPPrivateKey;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.key.impl.OldPGPFileKeyFinder;
 
 /**
  * User Charlie reads an entry in the demo encrypted composite file.
@@ -94,10 +95,11 @@ public class CharlieReadEncryptedTar
         return;
       }
       
-      KeyUtil ku = new KeyUtil( charlieseckeyfile, charliepubkeyfile );
-      PGPPrivateKey  prikey = ku.getPrivateKey("charlie", charliepw );      
-      PGPPublicKey  pubkey = ku.getPublicKey("charlie");      
-      EncryptedCompositeFileUser charlie = new EncryptedCompositeFileUser("charlie",prikey,pubkey,ku.pubringcoll );
+      OldPGPFileKeyFinder charliekeyfinder = new OldPGPFileKeyFinder( charlieseckeyfile, charliepubkeyfile );
+      charliekeyfinder.setPassphrase( charliepw );
+      charliekeyfinder.init();
+      
+      EncryptedCompositeFileUser charlie = new EncryptedCompositeFileUser( charliekeyfinder );
       EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
       
       in=compfile.getDecryptingInputStream(charlie,"little.txt.gpg");

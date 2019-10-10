@@ -27,6 +27,7 @@ import org.bouncycastle.openpgp.PGPPrivateKey;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.key.impl.OldPGPFileKeyFinder;
 
 /**
  * Bob will read an entry in the demo encrypted composite file that was created by Alice.
@@ -52,11 +53,11 @@ public class BobReadEncryptedTar
       File bobseckeyfile = new File( "demo/bob_secring.gpg" );
       File bobpubkeyfile = new File( "demo/bob_pubring.gpg" );
       
-      KeyUtil ku = new KeyUtil( bobseckeyfile, bobpubkeyfile );
-      PGPPrivateKey  prikey = ku.getPrivateKey("bob", "bob".toCharArray() );      
-      PGPPublicKey  pubkey = ku.getPublicKey("bob");
+      OldPGPFileKeyFinder bobkeyfinder = new OldPGPFileKeyFinder( bobseckeyfile, bobpubkeyfile );
+      bobkeyfinder.setPassphrase( "bob".toCharArray() );
+      bobkeyfinder.init();
       
-      EncryptedCompositeFileUser bob = new EncryptedCompositeFileUser("bob",prikey,pubkey, ku.pubringcoll );
+      EncryptedCompositeFileUser bob = new EncryptedCompositeFileUser( bobkeyfinder );
       EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
       
       in=compfile.getDecryptingInputStream(bob,"little.txt.gpg");

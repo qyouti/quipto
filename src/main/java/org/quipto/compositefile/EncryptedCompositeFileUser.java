@@ -15,62 +15,31 @@
  */
 package org.quipto.compositefile;
 
-import java.security.PrivateKey;
-import java.security.Provider;
 import java.util.HashMap;
-import org.bouncycastle.openpgp.PGPException;
-import org.bouncycastle.openpgp.PGPPrivateKey;
-import org.bouncycastle.openpgp.PGPPublicKey;
-import org.bouncycastle.openpgp.PGPPublicKeyRingCollection;
+import org.quipto.key.KeyFinder;
 
 /**
- *
+ * Represents a user session with (multiple) encrypted composite files.
+ * Currently used to cache per-user passphrases for those files.
+ * 
  * @author maber01
  */
 public class EncryptedCompositeFileUser
 {
-  String keyalias;
-  PGPPrivateKey pgpprivatekey;
-  PGPPublicKey pgppublickey;
-  PGPPublicKeyRingCollection pgppubkeyringcoll;
-  
+  KeyFinder keyfinder;
+    
   HashMap<String,PassPhraseStatus> passphrasestatusmap = new HashMap<>();
 
-  public EncryptedCompositeFileUser(
-          String keyalias, 
-          PGPPrivateKey pgpprivatekey, 
-          PGPPublicKey pgppublickey, 
-          PGPPublicKeyRingCollection pgppubkeyringcoll 
-  )
+  public EncryptedCompositeFileUser( KeyFinder keyfinder )
   {
-    this.keyalias = keyalias;
-    this.pgpprivatekey = pgpprivatekey;
-    this.pgppublickey = pgppublickey;
-    this.pgppubkeyringcoll = pgppubkeyringcoll;
+    this.keyfinder = keyfinder;
   }
 
-  public String getKeyalias()
+  public KeyFinder getKeyFinder()
   {
-    return keyalias;
+    return keyfinder;
   }
 
-  public PGPPrivateKey getPgpprivatekey()
-  {
-    return pgpprivatekey;
-  }
-
-  public PGPPublicKey getPgppublickey()
-  {
-    return pgppublickey;
-  }
-  
-  public PGPPublicKey getOtherPGPPublicKey( long id ) throws PGPException
-  {
-    if ( pgppubkeyringcoll == null )
-      return null;
-    return pgppubkeyringcoll.getPublicKey( id );
-  }
-  
   public void setPassPhraseStatus( String canonicalpath, int status )
   {
     PassPhraseStatus pps = passphrasestatusmap.get(canonicalpath);

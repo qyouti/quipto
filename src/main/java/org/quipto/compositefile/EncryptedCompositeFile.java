@@ -43,8 +43,10 @@ import org.bouncycastle.openpgp.PGPLiteralDataGenerator;
 import org.bouncycastle.openpgp.PGPOnePassSignature;
 import org.bouncycastle.openpgp.PGPOnePassSignatureList;
 import org.bouncycastle.openpgp.PGPPBEEncryptedData;
+import org.bouncycastle.openpgp.PGPPrivateKey;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyEncryptedData;
+import org.bouncycastle.openpgp.PGPSecretKey;
 import org.bouncycastle.openpgp.PGPSignature;
 import org.bouncycastle.openpgp.PGPSignatureGenerator;
 import org.bouncycastle.openpgp.PGPSignatureList;
@@ -60,6 +62,7 @@ import org.bouncycastle.openpgp.operator.jcajce.JcePGPDataEncryptorBuilder;
 import org.bouncycastle.openpgp.operator.jcajce.JcePublicKeyDataDecryptorFactoryBuilder;
 import org.bouncycastle.openpgp.operator.jcajce.JcePublicKeyKeyEncryptionMethodGenerator;
 import org.bouncycastle.util.io.Streams;
+import org.quipto.key.KeyFinder;
 
 /**
  * Subclasses CompositeFile to provide encryption for team work.
@@ -123,9 +126,11 @@ public class EncryptedCompositeFile
   }
   
 
-  private static String getPassphraseFileName( String alias )
+  private static String getPassphraseFileName( KeyFinder keyfinder, PGPPublicKey publickey )
   {
-    return ".encryption/passwords/" + alias + ".gpg";
+    long keyid = publickey.getKeyID();
+    String strkeyid = Long.toHexString(keyid);
+    return ".encryption/passwords/" + strkeyid + ".gpg";
   }
 
   private static boolean isPassphraseFileName( String name )
@@ -142,9 +147,10 @@ public class EncryptedCompositeFile
    * @throws IOException
    * @throws NoSuchProviderException 
    */
-  private void initPrivateKey( EncryptedCompositeFileUser eu )
+  private void initPassphraseForThisCompositeFile( EncryptedCompositeFileUser eu )
           throws IOException, NoSuchProviderException
   {
+    PGPPublicKey mypublickey = eu.getKeyFinder().getSecretKeyForDecryption().getPublicKey();
     int passphrasestatus = eu.getPassPhraseStatus( getCanonicalPath() );
     char[] passphrase=null;
     
@@ -152,6 +158,8 @@ public class EncryptedCompositeFile
       return;
     
     String name;
+    String strkeyid = Long.toHexString( eu.getKeyFinder().getSecretKeyForSigning().getKeyID() );
+
     for (ComponentEntry entry : componentmap.values())
     {
       name = entry.tararchiveentry.getName();
@@ -161,7 +169,8 @@ public class EncryptedCompositeFile
         {
           passphrasestatus = PASS_HIDDEN;
         }
-        if (name.equals(getPassphraseFileName(eu.getKeyalias())))
+        
+        if (name.equals( getPassphraseFileName(eu.getKeyFinder(), mypublickey) ) )
         {
           InputStream in = super.getInputStream(name);
           passphrase = decryptPassphrase(eu,in);
@@ -225,11 +234,14 @@ public class EncryptedCompositeFile
     {
       try
       {
-        BcPGPContentSignerBuilder signerbuilder = new BcPGPContentSignerBuilder(eu.pgppublickey.getAlgorithm(), HashAlgorithmTags.SHA256);
+        PGPSecretKey secretkey = eu.getKeyFinder().getSecretKeyForSigning();
+        PGPPublicKey publickey = secretkey.getPublicKey();
+        PGPPrivateKey privatekey = eu.getKeyFinder().getPrivateKey(secretkey);
+        BcPGPContentSignerBuilder signerbuilder = new BcPGPContentSignerBuilder( publickey.getAlgorithm(), HashAlgorithmTags.SHA256);
         siggen = new PGPSignatureGenerator(signerbuilder);
-        siggen.init( PGPSignature.BINARY_DOCUMENT, eu.getPgpprivatekey() );
+        siggen.init( PGPSignature.BINARY_DOCUMENT, privatekey );
         PGPSignatureSubpacketGenerator subpackgen = new PGPSignatureSubpacketGenerator();
-        subpackgen.setSignerUserID( false, eu.getKeyalias() );
+        subpackgen.setSignerUserID( false, eu.getKeyFinder().getPreferredAlias(secretkey) );
         siggen.setHashedSubpackets( subpackgen.generate() );
         // create the header that must precede the data and send it to 
         // the tar entry before the compressed, encrypted content
@@ -272,7 +284,7 @@ public class EncryptedCompositeFile
   {
     try
     {
-      initPrivateKey(eu);
+      initPassphraseForThisCompositeFile(eu);
     }
     catch (NoSuchProviderException ex)
     {
@@ -323,7 +335,7 @@ public class EncryptedCompositeFile
           throw new IOException( "Invalid Signature Format in data file." );
         inputwrapper.onepasssignature = inputwrapper.onepasssiglist.get(0);
         long keyid = inputwrapper.onepasssignature.getKeyID();
-        PGPPublicKey signerpubkey = eu.getOtherPGPPublicKey(keyid);
+        PGPPublicKey signerpubkey = eu.getKeyFinder().findPublicKey(keyid);
         if ( signerpubkey == null )
           throw new IOException( "Unable to find public key used to sign this data file." );
         BcPGPContentVerifierBuilderProvider converbuildprov = new BcPGPContentVerifierBuilderProvider();
@@ -428,7 +440,9 @@ public class EncryptedCompositeFile
   private char[] decryptPassphrase( EncryptedCompositeFileUser eu, InputStream in )
           throws IOException, NoSuchProviderException
   {
-    long keyid = eu.getPgppublickey().getKeyID();
+    PGPSecretKey secretkey = eu.getKeyFinder().getSecretKeyForDecryption();
+    PGPPrivateKey privatekey = eu.getKeyFinder().getPrivateKey(secretkey);
+    long keyid = secretkey.getKeyID();
     String pw = null;
     in = PGPUtil.getDecoderStream(in);
 
@@ -468,7 +482,7 @@ public class EncryptedCompositeFile
       }
 
       InputStream clear;
-      clear = pbe.getDataStream(new JcePublicKeyDataDecryptorFactoryBuilder().setProvider("BC").build(eu.getPgpprivatekey()));
+      clear = pbe.getDataStream(new JcePublicKeyDataDecryptorFactoryBuilder().setProvider("BC").build(privatekey));
       
       JcaPGPObjectFactory plainFact = new JcaPGPObjectFactory(clear);
       Object message = plainFact.nextObject();
@@ -547,7 +561,7 @@ public class EncryptedCompositeFile
    */
   public void addPublicKey(EncryptedCompositeFileUser eu, PGPPublicKey key, String name) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    initPrivateKey( eu );
+    initPassphraseForThisCompositeFile( eu );
     int passphrasestatus = eu.getPassPhraseStatus( getCanonicalPath() );
     if (passphrasestatus == PASS_HIDDEN)
     {
@@ -560,7 +574,7 @@ public class EncryptedCompositeFile
       eu.setPassPhraseStatus(getCanonicalPath(), PASS_KNOWN );
     }
 
-    OutputStream out = super.getOutputStream(getPassphraseFileName(name), true);
+    OutputStream out = super.getOutputStream(getPassphraseFileName(eu.getKeyFinder(),key), true);
     byte[] encrypted = encryptPassphrase( eu.getPassPhrase( getCanonicalPath() ), key, true);
     out.write(encrypted);
     out.close();

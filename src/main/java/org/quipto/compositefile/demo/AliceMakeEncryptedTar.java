@@ -23,6 +23,7 @@ import org.bouncycastle.openpgp.PGPPrivateKey;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.key.impl.OldPGPFileKeyFinder;
 
 /**
  * Alice creates an encrypted composite file. She will add herself and Bob to the users
@@ -53,25 +54,26 @@ public class AliceMakeEncryptedTar
       File aliceseckeyfile = new File( "demo/alice_secring.gpg" );
       File alicepubkeyfile = new File( "demo/alice_pubring.gpg" );
       
-      KeyUtil ku = new KeyUtil( aliceseckeyfile, alicepubkeyfile );
-      PGPPrivateKey  prikey = ku.getPrivateKey("alice", "alice".toCharArray() );
-      PGPPublicKey  pubkey = ku.getPublicKey( "alice" );
-      PGPPublicKey  otherpubkey = ku.getPublicKey( "bob" );
-      PGPPublicKey  pubkeythree = ku.getPublicKey( "charlie" );
+      OldPGPFileKeyFinder alicekeyfinder = new OldPGPFileKeyFinder( aliceseckeyfile, alicepubkeyfile );
+      alicekeyfinder.setPassphrase( "alice".toCharArray() );
+      alicekeyfinder.init();
       
-      OutputStream out;
-      EncryptedCompositeFileUser alice = new EncryptedCompositeFileUser("alice", prikey, pubkey, null );
+      PGPPublicKey  pubkey      = alicekeyfinder.findFirstPublicKey( "alice" );
+      PGPPublicKey  otherpubkey = alicekeyfinder.findFirstPublicKey( "bob" );
+      PGPPublicKey  pubkeythree = alicekeyfinder.findFirstPublicKey( "charlie" );
+      
+      EncryptedCompositeFileUser alice = new EncryptedCompositeFileUser( alicekeyfinder );
       
       EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
       compfile.addPublicKey( alice, pubkey, "alice" );
       compfile.addPublicKey( alice, otherpubkey, "bob" );
       if ( pubkeythree != null )
         compfile.addPublicKey( alice, pubkeythree, "charlie" );
+      
+      OutputStream out;
       out = compfile.getEncryptingOutputStream( alice, "bigdatafile.bin.gpg", false, true );
       for (i = 0; i < 202; i++)
-      {
         out.write(buffer);
-      }
       out.close();
 
       
