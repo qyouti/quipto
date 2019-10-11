@@ -23,11 +23,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
-import org.bouncycastle.openpgp.PGPPrivateKey;
-import org.bouncycastle.openpgp.PGPPublicKey;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
 import org.quipto.key.impl.OldPGPFileKeyFinder;
+import org.quipto.trust.impl.TrustAnythingContext;
 
 /**
  * Bob will read an entry in the demo encrypted composite file that was created by Alice.
@@ -57,7 +56,8 @@ public class BobReadEncryptedTar
       bobkeyfinder.setPassphrase( "bob".toCharArray() );
       bobkeyfinder.init();
       
-      EncryptedCompositeFileUser bob = new EncryptedCompositeFileUser( bobkeyfinder );
+      TrustAnythingContext trustcontext = new TrustAnythingContext();
+      EncryptedCompositeFileUser bob = new EncryptedCompositeFileUser( bobkeyfinder, trustcontext );
       EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
       
       in=compfile.getDecryptingInputStream(bob,"little.txt.gpg");

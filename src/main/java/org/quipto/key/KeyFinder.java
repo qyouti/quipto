@@ -26,6 +26,7 @@ public interface KeyFinder
   
   /**
    * Get the user's currently selected signing key.
+   * @param secretkey
    * @return 
    */
   public PGPPrivateKey getPrivateKey( PGPSecretKey secretkey );

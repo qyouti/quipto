@@ -63,6 +63,8 @@ import org.bouncycastle.openpgp.operator.jcajce.JcePublicKeyDataDecryptorFactory
 import org.bouncycastle.openpgp.operator.jcajce.JcePublicKeyKeyEncryptionMethodGenerator;
 import org.bouncycastle.util.io.Streams;
 import org.quipto.key.KeyFinder;
+import org.quipto.trust.TrustContextException;
+import org.quipto.trust.TrustContextReport;
 
 /**
  * Subclasses CompositeFile to provide encryption for team work.
@@ -338,6 +340,9 @@ public class EncryptedCompositeFile
         PGPPublicKey signerpubkey = eu.getKeyFinder().findPublicKey(keyid);
         if ( signerpubkey == null )
           throw new IOException( "Unable to find public key used to sign this data file." );
+        TrustContextReport report = eu.getTrustContext().checkTrusted( signerpubkey );
+        if( !report.isTrusted() )
+          throw new TrustContextException( report );
         BcPGPContentVerifierBuilderProvider converbuildprov = new BcPGPContentVerifierBuilderProvider();
         inputwrapper.onepasssignature.init( converbuildprov, signerpubkey );
         o = pgpFact.nextObject();

@@ -36,11 +36,11 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
-import org.bouncycastle.openpgp.PGPPrivateKey;
-import org.bouncycastle.openpgp.PGPPublicKey;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
 import org.quipto.key.impl.OldPGPFileKeyFinder;
+import org.quipto.trust.TrustContext;
+import org.quipto.trust.impl.TrustAnythingContext;
 
 /**
  * User Charlie reads an entry in the demo encrypted composite file.
@@ -93,22 +93,14 @@ public class CharlieReadEncryptedTar
       int x, i;
       InputStream in;
       File file = new File("demo/mydataenc.tar");
-      File passwordfile = new File( "demo/windowsprotectedpasswords.bin" );
       File charlieseckeyfile = new File( "demo/charlie_secring.gpg" );
       File charliepubkeyfile = new File( "demo/charlie_pubring.gpg" );
       
-      char[] charliepw = readEncryptedPassword( passwordfile );
-      if ( charliepw == null )
-      {
-        System.out.println( "Cannot open key files because unable to read password file.");
-        return;
-      }
-      
       OldPGPFileKeyFinder charliekeyfinder = new OldPGPFileKeyFinder( charlieseckeyfile, charliepubkeyfile );
-      charliekeyfinder.setPassphrase( charliepw );
       charliekeyfinder.init();
       
-      EncryptedCompositeFileUser charlie = new EncryptedCompositeFileUser( charliekeyfinder );
+      TrustContext trustcontext = new TrustAnythingContext();
+      EncryptedCompositeFileUser charlie = new EncryptedCompositeFileUser( charliekeyfinder, trustcontext );
       EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
       
       in=compfile.getDecryptingInputStream(charlie,"little.txt.gpg");
@@ -125,10 +117,6 @@ public class CharlieReadEncryptedTar
       in.close();
       compfile.close();
       System.out.print( "\n\n" );
-    }
-    catch ( KeyStoreException kse )
-    {
-      System.out.println("This demo requires access to the Windows certificate store but it is not available.  Not running on Windows?");
     }
     catch (IOException ex)
     {

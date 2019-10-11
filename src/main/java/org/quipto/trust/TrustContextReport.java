@@ -6,7 +6,7 @@
 package org.quipto.trust;
 
 /**
- *
+ * Reports if a trust relationship stands and if not provides an explanation.
  * @author maber01
  */
 public class TrustContextReport

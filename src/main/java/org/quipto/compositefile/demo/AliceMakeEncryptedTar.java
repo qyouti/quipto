@@ -19,11 +19,11 @@ import java.io.File;
 import java.io.OutputStream;
 import java.security.Security;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openpgp.PGPPrivateKey;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
 import org.quipto.key.impl.OldPGPFileKeyFinder;
+import org.quipto.trust.impl.TrustAnythingContext;
 
 /**
  * Alice creates an encrypted composite file. She will add herself and Bob to the users
@@ -62,7 +62,8 @@ public class AliceMakeEncryptedTar
       PGPPublicKey  otherpubkey = alicekeyfinder.findFirstPublicKey( "bob" );
       PGPPublicKey  pubkeythree = alicekeyfinder.findFirstPublicKey( "charlie" );
       
-      EncryptedCompositeFileUser alice = new EncryptedCompositeFileUser( alicekeyfinder );
+      TrustAnythingContext trustcontext = new TrustAnythingContext();
+      EncryptedCompositeFileUser alice = new EncryptedCompositeFileUser( alicekeyfinder, trustcontext );
       
       EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
       compfile.addPublicKey( alice, pubkey, "alice" );

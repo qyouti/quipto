@@ -17,6 +17,7 @@ package org.quipto.compositefile;
 
 import java.util.HashMap;
 import org.quipto.key.KeyFinder;
+import org.quipto.trust.TrustContext;
 
 /**
  * Represents a user session with (multiple) encrypted composite files.
@@ -27,12 +28,14 @@ import org.quipto.key.KeyFinder;
 public class EncryptedCompositeFileUser
 {
   KeyFinder keyfinder;
+  TrustContext trustcontext;
     
   HashMap<String,PassPhraseStatus> passphrasestatusmap = new HashMap<>();
 
-  public EncryptedCompositeFileUser( KeyFinder keyfinder )
+  public EncryptedCompositeFileUser( KeyFinder keyfinder, TrustContext trustcontext )
   {
     this.keyfinder = keyfinder;
+    this.trustcontext = trustcontext;
   }
 
   public KeyFinder getKeyFinder()
@@ -40,6 +43,13 @@ public class EncryptedCompositeFileUser
     return keyfinder;
   }
 
+  public TrustContext getTrustContext()
+  {
+    return trustcontext;
+  }
+
+  
+  
   public void setPassPhraseStatus( String canonicalpath, int status )
   {
     PassPhraseStatus pps = passphrasestatusmap.get(canonicalpath);

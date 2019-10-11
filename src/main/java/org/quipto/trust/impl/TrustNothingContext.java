@@ -10,14 +10,14 @@ import org.quipto.trust.TrustContext;
 import org.quipto.trust.TrustContextReport;
 
 /**
- * Silly implementation that trusts any public key
+ * Another silly implementation that trusts no public key.
  * 
  * @author maber01
  */
-public class TrustAnythingContext implements TrustContext
+public class TrustNothingContext implements TrustContext
 {
   /**
-   * Is the public key trusted. Yes, always!
+   * Is the public key trusted - no, never!
    * @param pubkey
    * @return 
    */
@@ -26,7 +26,7 @@ public class TrustAnythingContext implements TrustContext
   {
     if ( pubkey == null )
       return new TrustContextReport( false, "Empty key cannot be trusted to sign data files." );
-    return new TrustContextReport( true, "Trusted." );
+    return new TrustContextReport( false, "Not trusted because a 'trust nothing' setting was selected." );
   }
   
 }
