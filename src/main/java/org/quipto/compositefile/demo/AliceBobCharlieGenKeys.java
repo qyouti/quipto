@@ -15,9 +15,11 @@
  */
 package org.quipto.compositefile.demo;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Security;
 import java.security.SignatureException;
@@ -25,13 +27,21 @@ import java.util.ArrayList;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
+import org.bouncycastle.openpgp.PGPKeyPair;
+import org.bouncycastle.openpgp.PGPPrivateKey;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
 import org.bouncycastle.openpgp.PGPPublicKeyRingCollection;
 import org.bouncycastle.openpgp.PGPSecretKey;
 import org.bouncycastle.openpgp.PGPSecretKeyRing;
 import org.bouncycastle.openpgp.PGPSecretKeyRingCollection;
-import org.quipto.key.impl.StandardRSAKeyBuilder;
+import org.quipto.QuiptoStandards;
+import org.quipto.compositefile.EncryptedCompositeFile;
+import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.key.impl.CompositeFileKeyStore;
+import org.quipto.key.impl.StandardRSAKeyBuilderSigner;
+import org.quipto.passwords.PasswordPasswordHandler;
+import org.quipto.passwords.WindowsPasswordHandler;
 
 /**
  * Generates RSA PGPPublicKey/PGPSecretKey pairs for demos.
@@ -41,87 +51,75 @@ import org.quipto.key.impl.StandardRSAKeyBuilder;
  */
 public class AliceBobCharlieGenKeys
 {
+  final String[] aliases = { "alice", "bob", "charlie", "debbie" };
 
-  PGPSecretKeyRingCollection[] secringcoll = new PGPSecretKeyRingCollection[3];
-  PGPPublicKeyRingCollection[] pubringcoll = new PGPPublicKeyRingCollection[3];
+  CompositeFileKeyStore[] keyringfile = new CompositeFileKeyStore[aliases.length];
   
-  String[] aliases = { "alice", "bob", "charlie" };
   
-  private void createKeyRings() throws IOException, PGPException
+  private void createKeyRings() throws IOException, PGPException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    secringcoll[0] = new PGPSecretKeyRingCollection( new ArrayList<>() );
-    secringcoll[1] = new PGPSecretKeyRingCollection( new ArrayList<>() );
-    secringcoll[2] = new PGPSecretKeyRingCollection( new ArrayList<>() );
-    
-    pubringcoll[0] = new PGPPublicKeyRingCollection( new ArrayList<>() );
-    pubringcoll[1] = new PGPPublicKeyRingCollection( new ArrayList<>() );    
-    pubringcoll[2] = new PGPPublicKeyRingCollection( new ArrayList<>() );    
-  }
-  
-  
-  private void saveKeyRings() throws IOException
-  {
-    FileOutputStream out;
-    
-    for ( int i=0; i<aliases.length; i++ )
+    for ( int i=0; i<aliases.length; i++  )
     {
-      if ( secringcoll[i] != null )
-      {
-        out = new FileOutputStream("demo/" + aliases[i] + "_secring.gpg");
-        secringcoll[i].encode(out);
-        out.close();
-      }
-
-      out = new FileOutputStream("demo/" + aliases[i] + "_pubring.gpg");
-      pubringcoll[i].encode(out);
-      out.close();
+      File file = new File("demo/" + aliases[i] + "home/keyring.tar");
+      if ( file.exists() )
+        file.delete();
+      EncryptedCompositeFileUser eu;
+      if ( "charlie".equals( aliases[i]) )
+        eu = new EncryptedCompositeFileUser( new WindowsPasswordHandler() );
+      else
+        eu = new EncryptedCompositeFileUser( new PasswordPasswordHandler( aliases[i] + "@thingy.com", aliases[i].toCharArray() ) );
+      keyringfile[i] = new CompositeFileKeyStore( EncryptedCompositeFile.getCompositeFile( file ), eu );
     }
   }
   
-  
-  private void storeKeyPair( int secretOut, PGPSecretKey secretKey)
-          throws IOException, InvalidKeyException, NoSuchProviderException, SignatureException, PGPException
+  private void storePublicKey( int i, PGPPublicKey key ) throws IOException, PGPException
   {
-    PGPPublicKey key = secretKey.getPublicKey();
-
-    ArrayList<PGPSecretKey> seckeylist = new ArrayList<>();
-    seckeylist.add(secretKey);
-    PGPSecretKeyRing secretKeyRing = new PGPSecretKeyRing(seckeylist);
-
     ArrayList<PGPPublicKey> keylist = new ArrayList<>();
     keylist.add(key);
     PGPPublicKeyRing keyring = new PGPPublicKeyRing(keylist);
-    
-    // add secret stuff to own
-    secringcoll[secretOut] = PGPSecretKeyRingCollection.addSecretKeyRing( secringcoll[secretOut], secretKeyRing );
-    // add public to all
-    for ( int i=0; i<pubringcoll.length; i++ )
-      pubringcoll[i] = PGPPublicKeyRingCollection.addPublicKeyRing( pubringcoll[i], keyring );
+    ArrayList<PGPPublicKeyRing> ringlist = new ArrayList<>();
+    ringlist.add(keyring);
+    PGPPublicKeyRingCollection collection = new PGPPublicKeyRingCollection( ringlist );
+    keyringfile[i].setPublicKeyRingCollection(collection);
   }
 
+  private void storeSecretKey( int i, PGPSecretKey key ) throws IOException, PGPException
+  {
+    ArrayList<PGPSecretKey> keylist = new ArrayList<>();
+    keylist.add(key);
+    PGPSecretKeyRing keyring = new PGPSecretKeyRing(keylist);
+    ArrayList<PGPSecretKeyRing> ringlist = new ArrayList<>();
+    ringlist.add(keyring);
+    PGPSecretKeyRingCollection collection = new PGPSecretKeyRingCollection( ringlist );
+    keyringfile[i].setSecretKeyRingCollection(collection);
+    storePublicKey( i, key.getPublicKey() );
+  }
 
   private void run()
           throws Exception
   {
     Security.addProvider(new BouncyCastleProvider());
 
-    StandardRSAKeyBuilder keybuilder = new StandardRSAKeyBuilder();
-    
-    PGPSecretKey aliceseckey    = keybuilder.buildSecretKey( "alice",  "alice".toCharArray(), false );
-    PGPSecretKey bobseckey      = keybuilder.buildSecretKey( "bob",      "bob".toCharArray(), false );
-    PGPSecretKey charlieseckey  = keybuilder.buildSecretKey( "charlie", null,                 true  );
-    
     // Create key rings for all the demo users
     createKeyRings();
-    // Put keys pairs in OpenPGP format and put in OpenPGP key rings
-    storeKeyPair( 0, aliceseckey );
-    storeKeyPair( 1, bobseckey );
-    // Do charlie's keys if created
-    if ( charlieseckey != null )
-      storeKeyPair( 2, charlieseckey );
     
-    // Save the key rings to files
-    saveKeyRings();
+    StandardRSAKeyBuilderSigner keybuilder = new StandardRSAKeyBuilderSigner();    
+    PGPSecretKey[] secretkey = new PGPSecretKey[aliases.length];
+    for ( int i=0; i<aliases.length; i++ )
+    {
+      secretkey[i]    = keybuilder.buildSecretKey( aliases[i], QuiptoStandards.SECRET_KEY_STANDARD_PASS );
+      if ( secretkey[i] != null )
+        storeSecretKey( i, secretkey[i] );
+    }
+
+    // sign and store stuff
+    // Alice and Bob trust each other to sign....
+    storePublicKey( 0, secretkey[1].getPublicKey() );
+    storePublicKey( 1, secretkey[0].getPublicKey() );
+
+    // Alice and Charlie
+    storePublicKey( 0, secretkey[2].getPublicKey() );
+    storePublicKey( 2, secretkey[0].getPublicKey() );
   }
 
    

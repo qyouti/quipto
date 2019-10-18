@@ -22,10 +22,8 @@ public class TrustAnythingContext implements TrustContext
    * @return 
    */
   @Override
-  public TrustContextReport checkTrusted(PGPPublicKey pubkey)
+  public TrustContextReport checkTrusted( long signerkeyid )
   {
-    if ( pubkey == null )
-      return new TrustContextReport( false, "Empty key cannot be trusted to sign data files." );
     return new TrustContextReport( true, "Trusted." );
   }
   

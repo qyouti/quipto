@@ -17,5 +17,5 @@ import org.bouncycastle.openpgp.PGPPublicKey;
  */
 public interface TrustContext
 {
-  TrustContextReport checkTrusted( PGPPublicKey pubkey );
+  TrustContextReport checkTrusted( long signerkeyid );
 }

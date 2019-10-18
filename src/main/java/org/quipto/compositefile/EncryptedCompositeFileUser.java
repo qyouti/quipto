@@ -29,6 +29,7 @@ public class EncryptedCompositeFileUser
 {
   KeyFinder keyfinder;
   TrustContext trustcontext;
+  EncryptedCompositeFilePasswordHandler passhandler;
     
   HashMap<String,PassPhraseStatus> passphrasestatusmap = new HashMap<>();
 
@@ -36,6 +37,11 @@ public class EncryptedCompositeFileUser
   {
     this.keyfinder = keyfinder;
     this.trustcontext = trustcontext;
+  }
+  
+  public EncryptedCompositeFileUser( EncryptedCompositeFilePasswordHandler passhandler )
+  {
+    this.passhandler = passhandler;
   }
 
   public KeyFinder getKeyFinder()
@@ -46,6 +52,11 @@ public class EncryptedCompositeFileUser
   public TrustContext getTrustContext()
   {
     return trustcontext;
+  }
+
+  public EncryptedCompositeFilePasswordHandler getPasswordHandler()
+  {
+    return passhandler;
   }
 
   

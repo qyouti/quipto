@@ -18,8 +18,7 @@ public interface KeyBuilder
    * Build a key pair.
    * @param userid
    * @param passphrase
-   * @param windowsprotection
    * @return 
    */
-  public PGPSecretKey buildSecretKey( String userid, char[] passphrase, boolean windowsprotection );
+  public PGPSecretKey buildSecretKey( String userid, char[] passphrase );
 }

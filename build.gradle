@@ -29,6 +29,20 @@ task runAliceMakeEncryptedTar(type: JavaExec){
     main = 'org.quipto.compositefile.demo.AliceMakeEncryptedTar'
 }
 
+task runAliceMakePrivateEncryptedTar(type: JavaExec){
+    description = "Demo user Alice creates an encrypted tar file for her own private use."
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'org.quipto.compositefile.demo.AliceMakePrivateEncryptedTar'
+    jvmArgs '-Djava.library.path=..\\winselfcert\\winselfcertdll\\dist\\Release\\Cygwin-Windows'
+}
+
+task runAliceReadPrivateEncryptedTar(type: JavaExec){
+    description = "Demo user Alice creates an encrypted tar file for her own private use."
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'org.quipto.compositefile.demo.AliceReadPrivateEncryptedTar'
+    jvmArgs '-Djava.library.path=..\\winselfcert\\winselfcertdll\\dist\\Release\\Cygwin-Windows'
+}
+
 task runBobReadEncryptedTar(type: JavaExec){
     description = "Demo user Bob reads the file Alice created"
     classpath = sourceSets.main.runtimeClasspath

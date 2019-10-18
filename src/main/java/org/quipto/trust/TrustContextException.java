@@ -24,4 +24,11 @@ public class TrustContextException
     super( report.getMessage() );
     this.report = report;
   }
+
+  public TrustContextReport getReport()
+  {
+    return report;
+  }
+  
+  
 }

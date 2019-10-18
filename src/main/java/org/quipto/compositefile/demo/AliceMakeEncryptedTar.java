@@ -16,13 +16,17 @@
 package org.quipto.compositefile.demo;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.security.Security;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPPublicKey;
+import org.bouncycastle.openpgp.PGPSecretKey;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
-import org.quipto.key.impl.OldPGPFileKeyFinder;
+import org.quipto.key.impl.CompositeFileKeyFinder;
+import org.quipto.key.impl.CompositeFileKeyStore;
+import org.quipto.passwords.PasswordPasswordHandler;
 import org.quipto.trust.impl.TrustAnythingContext;
 
 /**
@@ -47,29 +51,39 @@ public class AliceMakeEncryptedTar
 
     try
     {
-      File file = new File("demo/mydataenc.tar");
+      File file = new File("demo/shared/mydataenc.tar");
       if ( file.exists() )
         file.delete();
       
-      File aliceseckeyfile = new File( "demo/alice_secring.gpg" );
-      File alicepubkeyfile = new File( "demo/alice_pubring.gpg" );
+//      File teamtrustfile = new File("demo/shared/teamtrust.tar");
+//      if ( teamtrustfile.exists() )
+//        teamtrustfile.delete();      
+//      TeamTrust teamtrust = new TeamTrust( teamtrustfile, alicekeyfinder );
+//      teamtrust.init();
+
+
+      String alicealias = "alice";
+      EncryptedCompositeFileUser alicekeystoreeu = new EncryptedCompositeFileUser( new PasswordPasswordHandler( "alice@thingy.com", "alice".toCharArray() ) );
+      CompositeFileKeyStore keyringstore = new CompositeFileKeyStore( EncryptedCompositeFile.getCompositeFile( new File("demo/alicehome/keyring.tar") ), alicekeystoreeu );
+      CompositeFileKeyFinder keyfinder = new CompositeFileKeyFinder( keyringstore, alicealias, alicealias );
+      keyfinder.init();
+      PGPSecretKey secretkey = keyfinder.getSecretKeyForDecryption();
+      PGPPublicKey bobkey = keyfinder.findFirstPublicKey("bob");
+      if ( bobkey == null )
+        throw new IOException( "Can't find Bob's public key.");
+      PGPPublicKey charliekey = keyfinder.findFirstPublicKey("charlie");
+      if ( charliekey == null )
+        throw new IOException( "Can't find Charlie's public key.");
+      PGPPublicKey debbiekey = keyfinder.findFirstPublicKey("debbie");
+      if ( debbiekey == null )
+        throw new IOException( "Can't find Debbie's public key.");
       
-      OldPGPFileKeyFinder alicekeyfinder = new OldPGPFileKeyFinder( aliceseckeyfile, alicepubkeyfile );
-      alicekeyfinder.setPassphrase( "alice".toCharArray() );
-      alicekeyfinder.init();
-      
-      PGPPublicKey  pubkey      = alicekeyfinder.findFirstPublicKey( "alice" );
-      PGPPublicKey  otherpubkey = alicekeyfinder.findFirstPublicKey( "bob" );
-      PGPPublicKey  pubkeythree = alicekeyfinder.findFirstPublicKey( "charlie" );
-      
-      TrustAnythingContext trustcontext = new TrustAnythingContext();
-      EncryptedCompositeFileUser alice = new EncryptedCompositeFileUser( alicekeyfinder, trustcontext );
-      
+      EncryptedCompositeFileUser alice = new EncryptedCompositeFileUser( keyfinder, new TrustAnythingContext() );
       EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
-      compfile.addPublicKey( alice, pubkey, "alice" );
-      compfile.addPublicKey( alice, otherpubkey, "bob" );
-      if ( pubkeythree != null )
-        compfile.addPublicKey( alice, pubkeythree, "charlie" );
+      compfile.addPublicKey( alice, secretkey.getPublicKey() );
+      compfile.addPublicKey( alice, bobkey );
+      compfile.addPublicKey( alice, charliekey );
+      compfile.addPublicKey( alice, debbiekey );
       
       OutputStream out;
       out = compfile.getEncryptingOutputStream( alice, "bigdatafile.bin.gpg", false, true );

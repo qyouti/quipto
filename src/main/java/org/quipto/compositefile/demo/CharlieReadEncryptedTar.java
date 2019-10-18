@@ -24,6 +24,7 @@ import java.security.InvalidKeyException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.Security;
 import java.security.UnrecoverableKeyException;
@@ -38,7 +39,11 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.key.impl.CompositeFileKeyFinder;
+import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.key.impl.OldPGPFileKeyFinder;
+import org.quipto.passwords.PasswordPasswordHandler;
+import org.quipto.passwords.WindowsPasswordHandler;
 import org.quipto.trust.TrustContext;
 import org.quipto.trust.impl.TrustAnythingContext;
 
@@ -49,84 +54,15 @@ import org.quipto.trust.impl.TrustAnythingContext;
  */
 public class CharlieReadEncryptedTar
 {
-
-  public static char[] readEncryptedPassword( File file ) 
-          throws KeyStoreException
-  {
-    try
-    {
-      KeyStore keyStore = KeyStore.getInstance("Windows-MY");
-      keyStore.load(null, null);  // Load keystore 
-      PrivateKey k = (PrivateKey)keyStore.getKey("My key pair for guarding passwords", null );    
-
-      FileInputStream fin = new FileInputStream( file );
-      ByteArrayOutputStream baout = new ByteArrayOutputStream();
-      int b;
-      while ( (b = fin.read()) >=0  )
-        baout.write( b );
-      fin.close();
-      baout.close();
-
-      Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-      cipher.init( Cipher.DECRYPT_MODE, k );
-      byte[] decrypt = cipher.doFinal( baout.toByteArray() );
-      System.out.println( "Password is: " + new String( decrypt, "UTF8" ) );
-      return new String( decrypt, "UTF8" ).toCharArray();
-    }
-    catch ( IOException | InvalidKeyException | NoSuchAlgorithmException | UnrecoverableKeyException | CertificateException | BadPaddingException | IllegalBlockSizeException | NoSuchPaddingException e )
-    {
-      e.printStackTrace();
-    }
-    return null;
-  }
-  
-  
   /**
    * @param args the command line arguments
    */
   public static void main(String[] args)
   {
     Security.addProvider(new BouncyCastleProvider());
-    
-    try
-    {
-      int x, i;
-      InputStream in;
-      File file = new File("demo/mydataenc.tar");
-      File charlieseckeyfile = new File( "demo/charlie_secring.gpg" );
-      File charliepubkeyfile = new File( "demo/charlie_pubring.gpg" );
-      
-      OldPGPFileKeyFinder charliekeyfinder = new OldPGPFileKeyFinder( charlieseckeyfile, charliepubkeyfile );
-      charliekeyfinder.init();
-      
-      TrustContext trustcontext = new TrustAnythingContext();
-      EncryptedCompositeFileUser charlie = new EncryptedCompositeFileUser( charliekeyfinder, trustcontext );
-      EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
-      
-      in=compfile.getDecryptingInputStream(charlie,"little.txt.gpg");
-      System.out.print( "0  :  " );
-      for ( i=0; (x = in.read()) >= 0; i++ )
-      {
-        if ( x>15 )
-          System.out.print( Character.toString((char)x) /*Integer.toHexString(x)*/ );
-        else
-          System.out.print( "[0x" +Integer.toHexString(x) + "]" );
-        if ( i%64 == 63 )
-          System.out.print( "\n" +  Integer.toHexString(i+1) + "  :  " );
-      }
-      in.close();
-      compfile.close();
-      System.out.print( "\n\n" );
-    }
-    catch (IOException ex)
-    {
-      Logger.getLogger(BobReadEncryptedTar.class.getName()).log(Level.SEVERE, null, ex);
-    } catch (PGPException ex)
-    {
-      Logger.getLogger(BobReadEncryptedTar.class.getName()).log(Level.SEVERE, null, ex);
-    }
 
-
+    WindowsPasswordHandler passhandler = new WindowsPasswordHandler();
+    ReadEncryptedTar.readEncryptedTar( "charlie", passhandler, "bobs contribution.txt.gpg");      
   }
 
 }

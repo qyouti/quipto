@@ -8,7 +8,10 @@ package org.quipto.key.impl;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Iterator;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bouncycastle.bcpg.sig.NotationData;
@@ -28,6 +31,7 @@ import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder;
 import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider;
 import org.bouncycastle.util.Arrays;
 import org.quipto.QuiptoStandards;
+import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.key.KeyFinder;
 import org.quipto.key.KeyFinderException;
 
@@ -35,44 +39,34 @@ import org.quipto.key.KeyFinderException;
  * An implementation of KeyFinder that loads keys from old style OpenPGP key ring files.
  * @author maber01
  */
-public class OldPGPFileKeyFinder implements KeyFinder
+public class CompositeFileKeyFinder implements KeyFinder
 {
-  File secfile, pubfile;
-  PGPSecretKeyRingCollection secringcoll;
-  PGPPublicKeyRingCollection pubringcoll;
+  
   KeyFingerPrintCalculator fpcalc = new BcKeyFingerprintCalculator();
   BcPBESecretKeyDecryptorBuilder seckeydecbuilder = new BcPBESecretKeyDecryptorBuilder(  new BcPGPDigestCalculatorProvider() );
-
+  PBESecretKeyDecryptor keydecryptor = seckeydecbuilder.build( QuiptoStandards.SECRET_KEY_STANDARD_PASS );
+          
+  CompositeFileKeyStore store;
+  String signingalias, encryptingalias;
+          
   PGPSecretKey  secretkeyforsigning;
   PGPPrivateKey privatekeyforsigning;
-  
-  private char[] passphrase;
+
+  PGPSecretKey  secretkeyforencrypting;
+  PGPPrivateKey privatekeyforencrypting;
   
   /**
    * Construct by referencing files containing KeyRingCollections.
    * 
-   * @param secfile
-   * @param pubfile 
+   * @param tarfile
    */
-  public OldPGPFileKeyFinder( File secfile, File pubfile )
+  public CompositeFileKeyFinder( CompositeFileKeyStore store, String signingalias, String encryptingalias ) throws IOException
   {
-    this.secfile = secfile;
-    this.pubfile = pubfile;
+    this.store = store;
+    this.signingalias = signingalias;
+    this.encryptingalias = encryptingalias;
   }
 
-  /**
-   * Set a passphrase that will be used to decrypt private keys from the secret key ring.
-   * Null passphrase can be used if a Windows key pair is used to protect the password.
-   * 
-   * @param passphrase 
-   */
-  public void setPassphrase( char[] passphrase )
-  {
-    if ( passphrase == null )
-      this.passphrase = null;
-    else
-      this.passphrase = Arrays.clone(passphrase);
-  }
   
   /**
    * Load keys from the files. Also decide which private key is the default for signing and decrypting.
@@ -82,62 +76,29 @@ public class OldPGPFileKeyFinder implements KeyFinder
    */
   public void init() throws IOException, PGPException
   {
-    FileInputStream fin;
-    if ( secfile != null )
+    PGPSecretKeyRingCollection[] coll = new PGPSecretKeyRingCollection[2];
+    PGPSecretKey secretkey;
+    PGPPrivateKey privatekey;
+    for ( int i=0; i<2; i++ )
     {
-      fin = new FileInputStream( secfile );
-      secringcoll = new PGPSecretKeyRingCollection( fin, fpcalc );
-    }
-    if ( pubfile != null )
-    {
-      fin = new FileInputStream( pubfile );
-      pubringcoll = new PGPPublicKeyRingCollection( fin, fpcalc );
-    }
-    
-    // use first key in secringcoll as user's selected signing/decryption key
-    Iterator<PGPSecretKeyRing> keyringiter = secringcoll.getKeyRings();
-    if ( !keyringiter.hasNext() )
-      throw new IOException( "The given secret key ring file is empty." );
-    PGPSecretKeyRing keyring = keyringiter.next();
-    secretkeyforsigning = keyring.getSecretKey();
-    privatekeyforsigning = loadPrivateKey( secretkeyforsigning );
-  }
-
-  /**  
-   * Load the encrypted private key either with a supplied password or using the 
-   * Windows encrypted password stored in the public key's signature.
-   * @param secretkey
-   * @return
-   * @throws PGPException 
-   */
-  private PGPPrivateKey loadPrivateKey( PGPSecretKey secretkey ) throws PGPException
-  {
-    char[] effectivepassphrase = passphrase;
-    Iterator<PGPSignature> sigiter = secretkey.getPublicKey().getSignatures();
-    PGPSignature sig;
-    NotationData[] notdataarray;
-    while ( sigiter.hasNext() )
-    {
-      sig = sigiter.next();
-      notdataarray = sig.getHashedSubPackets().getNotationDataOccurrences();
-      String strencryptedpass=null;
-      String alias=null;
-      for ( NotationData notdata : notdataarray )
+      coll[i] = store.getSecretKeyRingCollection( (i==0)?signingalias:encryptingalias );
+      secretkey = coll[i].getKeyRings().next().getSecretKey();
+      privatekey = secretkey.extractPrivateKey( keydecryptor );
+      if ( i==0 )
       {
-        if ( QuiptoStandards.NOTATION_NAME_ENCRYPTED_PASSPHRASE.equals( notdata.getNotationName() ) )
-          strencryptedpass=notdata.getNotationValue();
-        if ( QuiptoStandards.NOTATION_NAME_WINDOWS_ALIAS.equals( notdata.getNotationName() ) )
-          alias=notdata.getNotationValue();
+        secretkeyforsigning = secretkey;
+        privatekeyforsigning = privatekey;
       }
-      if ( strencryptedpass != null && alias != null )
+      if ( i==1 || signingalias.equals( encryptingalias ) )
       {
-        effectivepassphrase = null;
+        secretkeyforencrypting = secretkey;
+        privatekeyforencrypting = privatekey;
         break;
       }
     }
-    PBESecretKeyDecryptor dec = seckeydecbuilder.build(effectivepassphrase);
-    return secretkey.extractPrivateKey(dec);
   }
+
+
   
   /**
    * Get the first alias associated with the selected private key
@@ -193,15 +154,17 @@ public class OldPGPFileKeyFinder implements KeyFinder
   @Override
   public PGPPublicKey findPublicKey(long keyid)
   {
+    PGPPublicKeyRingCollection coll = store.getPublicKeyRingCollection( keyid );
+    if ( coll == null ) return null;
     try
     {
-      return pubringcoll.getPublicKey(keyid);
+      return coll.getPublicKey(keyid);
     }
     catch (PGPException ex)
     {
-      Logger.getLogger(OldPGPFileKeyFinder.class.getName()).log(Level.SEVERE, null, ex);
-      return null;
+      Logger.getLogger(CompositeFileKeyFinder.class.getName()).log(Level.SEVERE, null, ex);
     }
+    return null;
   }
 
   /**
@@ -251,36 +214,9 @@ public class OldPGPFileKeyFinder implements KeyFinder
    */
   public PGPPublicKey findFirstPublicKey( String userid )
   {
-    try
-    {
-      Iterator<PGPPublicKeyRing> keyringiter = pubringcoll.getKeyRings(userid);      
-      PGPPublicKeyRing keyring;
-      Iterator<PGPPublicKey> keyiter;
-      PGPPublicKey pubkey;
-      Iterator<String> iter;
-      String founduserid;
-      while ( keyringiter.hasNext() )
-      {
-        keyring = keyringiter.next();
-        keyiter = keyring.getPublicKeys();
-        while ( keyiter.hasNext() )
-        {
-          pubkey = keyiter.next();
-          iter = pubkey.getUserIDs();
-          while ( iter.hasNext())
-          {
-            founduserid = iter.next();
-            if ( userid.equals( founduserid ) )
-              return pubkey;
-          }
-        }
-      }
-      return null;
-    }
-    catch (PGPException ex)
-    {
-      Logger.getLogger(OldPGPFileKeyFinder.class.getName()).log(Level.SEVERE, null, ex);
-      return null;
-    }
+    PGPPublicKeyRingCollection coll = store.getPublicKeyRingCollection( userid );
+    if ( coll == null ) return null;
+    PGPPublicKeyRing keyring = coll.getKeyRings().next();
+    return keyring.getPublicKeys().next();
   }
 }
