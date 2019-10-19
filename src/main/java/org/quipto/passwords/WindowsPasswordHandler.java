@@ -56,13 +56,11 @@ public class WindowsPasswordHandler implements EncryptedCompositeFilePasswordHan
    * 
    * @param name 
    */
-  public WindowsPasswordHandler()
+  public WindowsPasswordHandler() throws KeyStoreException
   {
     encryptionproperties = new Properties();
     encryptionproperties.setProperty( "windowspasswordhandler", "true" );
-    
     name = System.getProperty("user.name");
-    
     initKeys( name );
   }
   
@@ -141,7 +139,7 @@ public class WindowsPasswordHandler implements EncryptedCompositeFilePasswordHan
     }
   }
 
-  private void initKeys( String userid )
+  private void initKeys( String userid ) throws KeyStoreException
   {
     final String preamble = "Quipto password guard for ";
     String alias = preamble + userid;
@@ -153,7 +151,7 @@ public class WindowsPasswordHandler implements EncryptedCompositeFilePasswordHan
     }
   }
   
-  private void getWindowsKeys( String alias )
+  private void getWindowsKeys( String alias ) throws KeyStoreException
   {
     try
     {
@@ -168,7 +166,7 @@ public class WindowsPasswordHandler implements EncryptedCompositeFilePasswordHan
       publickey = certificate.getPublicKey();
       privatekey = (PrivateKey)keystore.getKey( alias, null );
     }
-    catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException | UnrecoverableKeyException ex )
+    catch ( IOException | NoSuchAlgorithmException | CertificateException | UnrecoverableKeyException ex )
     {
       Logger.getLogger(StandardRSAKeyBuilderSigner.class.getName()).log(Level.SEVERE, null, ex);
       publickey = null;

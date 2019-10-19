@@ -51,7 +51,10 @@ public class AliceMakeEncryptedTar
 
     try
     {
-      File file = new File("demo/shared/mydataenc.tar");
+      File dir = new File( "demo/shared" );
+      if ( !dir.exists() )
+        dir.mkdir();
+      File file = new File(dir, "mydataenc.tar");
       if ( file.exists() )
         file.delete();
       
@@ -72,8 +75,6 @@ public class AliceMakeEncryptedTar
       if ( bobkey == null )
         throw new IOException( "Can't find Bob's public key.");
       PGPPublicKey charliekey = keyfinder.findFirstPublicKey("charlie");
-      if ( charliekey == null )
-        throw new IOException( "Can't find Charlie's public key.");
       PGPPublicKey debbiekey = keyfinder.findFirstPublicKey("debbie");
       if ( debbiekey == null )
         throw new IOException( "Can't find Debbie's public key.");
@@ -82,7 +83,8 @@ public class AliceMakeEncryptedTar
       EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
       compfile.addPublicKey( alice, secretkey.getPublicKey() );
       compfile.addPublicKey( alice, bobkey );
-      compfile.addPublicKey( alice, charliekey );
+      if ( charliekey != null )
+        compfile.addPublicKey( alice, charliekey );
       compfile.addPublicKey( alice, debbiekey );
       
       OutputStream out;

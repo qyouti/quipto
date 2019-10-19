@@ -54,15 +54,16 @@ import org.quipto.trust.impl.TrustAnythingContext;
  */
 public class CharlieReadEncryptedTar
 {
+  static String[] filenames = {"little.txt.gpg"};
   /**
    * @param args the command line arguments
    */
-  public static void main(String[] args)
+  public static void main(String[] args) throws KeyStoreException
   {
     Security.addProvider(new BouncyCastleProvider());
 
     WindowsPasswordHandler passhandler = new WindowsPasswordHandler();
-    ReadEncryptedTar.readEncryptedTar( "charlie", passhandler, "bobs contribution.txt.gpg");      
+    ReadEncryptedTar.readEncryptedTar( "charlie", passhandler, filenames );
   }
 
 }

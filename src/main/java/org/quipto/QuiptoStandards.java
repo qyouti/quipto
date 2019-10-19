@@ -7,7 +7,6 @@ package org.quipto;
 
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import static org.quipto.compositefile.EncryptedCompositeFile.passchars;
 
 /**
  * A holder for constants relating to quipto protocols
@@ -44,6 +43,8 @@ public class QuiptoStandards
   
   
   public final static char[] SECRET_KEY_STANDARD_PASS = "This does not need to be secure because the whole secret key ring collection is encrypted.".toCharArray();
+  
+  public static final String passchars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ0123456789.,;:[]}{=+-_)(*&%$";
   
   public static char[] generateRandomPassphrase() throws NoSuchAlgorithmException
   {

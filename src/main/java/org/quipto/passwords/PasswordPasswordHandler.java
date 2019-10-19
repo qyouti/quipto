@@ -80,13 +80,13 @@ public class PasswordPasswordHandler implements EncryptedCompositeFilePasswordHa
       JcaPGPObjectFactory pgpF = new JcaPGPObjectFactory(in);
       PGPEncryptedDataList enc;
       Object o = pgpF.nextObject();
-      System.out.println( "o = " + o.getClass() );
+      //System.out.println( "o = " + o.getClass() );
       if (o instanceof PGPEncryptedDataList)
         enc = (PGPEncryptedDataList) o;
       else
       {
         enc = (PGPEncryptedDataList) pgpF.nextObject();
-        System.out.println( "o = " + o.getClass() );
+        //System.out.println( "o = " + o.getClass() );
       }
       PGPPBEEncryptedData pbe = (PGPPBEEncryptedData) enc.get(0);
       InputStream clearin = pbe.getDataStream(
@@ -95,7 +95,7 @@ public class PasswordPasswordHandler implements EncryptedCompositeFilePasswordHa
               ).setProvider("BC").build( masterpass ) );
       JcaPGPObjectFactory pgpFact = new JcaPGPObjectFactory(clearin);
       o = pgpFact.nextObject();
-      System.out.println( "Object class " + o.getClass().toString() );
+      //System.out.println( "Object class " + o.getClass().toString() );
       PGPLiteralData ld = (PGPLiteralData) o;
       InputStream literalin = ld.getInputStream();
       

@@ -43,7 +43,7 @@ public class ReadEncryptedTar
   /**
    * @param args the command line arguments
    */
-  public static void readEncryptedTar( String alias, EncryptedCompositeFilePasswordHandler passhandler, String entryname )
+  public static void readEncryptedTar( String alias, EncryptedCompositeFilePasswordHandler passhandler, String[] entrynames )
   {
     Security.addProvider(new BouncyCastleProvider());
     
@@ -62,21 +62,23 @@ public class ReadEncryptedTar
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( keyfinder, new TrustAnythingContext() );
       EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
       
-      
-      in=compfile.getDecryptingInputStream( eu, entryname );
-      System.out.print( "0  :  " );
-      for ( i=0; (x = in.read()) >= 0; i++ )
+      for ( String entryname : entrynames )
       {
-        if ( x>15 )
-          System.out.print( Character.toString((char)x) /*Integer.toHexString(x)*/ );
-        else
-          System.out.print( "[0x" +Integer.toHexString(x) + "]" );
-        if ( i%64 == 63 )
-          System.out.print( "\n" +  Integer.toHexString(i+1) + "  :  " );
+        in=compfile.getDecryptingInputStream( eu, entryname );
+        System.out.print( "0  :  " );
+        for ( i=0; (x = in.read()) >= 0; i++ )
+        {
+          if ( x>15 )
+            System.out.print( Character.toString((char)x) /*Integer.toHexString(x)*/ );
+          else
+            System.out.print( "[0x" +Integer.toHexString(x) + "]" );
+          if ( i%64 == 63 )
+            System.out.print( "\n" +  Integer.toHexString(i+1) + "  :  " );
+        }
+        in.close();
+        System.out.print( "\n\n" );
       }
-      in.close();
       compfile.close();
-      System.out.print( "\n\n" );
     }
     catch (IOException ex)
     {

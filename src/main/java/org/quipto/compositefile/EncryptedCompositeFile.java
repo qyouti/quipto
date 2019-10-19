@@ -353,6 +353,7 @@ public class EncryptedCompositeFile
    */
   public  synchronized InputStream getDecryptingInputStream(EncryptedCompositeFileUser eu, String name ) throws IOException
   {
+    System.out.println( "Reading " + name );
     try
     {
       initPassphraseForThisCompositeFile(eu);
@@ -368,20 +369,20 @@ public class EncryptedCompositeFile
       throw new IOException("Unable to initialise decryption input because no pass phrase has been generated.");
     
     EncryptedInputWrapper inputwrapper = new EncryptedInputWrapper();
-    try
+    try ( InputStream  tarin = super.getInputStream(name) )
     {
-      inputwrapper.tarin = super.getInputStream(name);
+      inputwrapper.tarin = tarin;
       InputStream in = PGPUtil.getDecoderStream(inputwrapper.tarin);
       JcaPGPObjectFactory pgpF = new JcaPGPObjectFactory(in);
       PGPEncryptedDataList enc;
       Object o = pgpF.nextObject();
-      System.out.println( "o = " + o.getClass() );
+      //System.out.println( "o = " + o.getClass() );
       if (o instanceof PGPEncryptedDataList)
         enc = (PGPEncryptedDataList) o;
       else
       {
         enc = (PGPEncryptedDataList) pgpF.nextObject();
-        System.out.println( "o = " + o.getClass() );
+        //System.out.println( "o = " + o.getClass() );
       }
       inputwrapper.pbe = (PGPPBEEncryptedData) enc.get(0);
       inputwrapper.clearin = inputwrapper.pbe.getDataStream(
@@ -390,17 +391,18 @@ public class EncryptedCompositeFile
               ).setProvider("BC").build(passphrase) );
       JcaPGPObjectFactory pgpFact = new JcaPGPObjectFactory(inputwrapper.clearin);
       o = pgpFact.nextObject();
-      System.out.println( "Object class " + o.getClass().toString() );
+      //System.out.println( "Object class " + o.getClass().toString() );
       if (o instanceof PGPCompressedData)
       {
         PGPCompressedData cData = (PGPCompressedData) o;        
         pgpFact = new JcaPGPObjectFactory(cData.getDataStream());
         o = pgpFact.nextObject();
       }
-      System.out.println( "Object class " + o.getClass().toString() );
+      //System.out.println( "Object class " + o.getClass().toString() );
       
       if ( o instanceof PGPOnePassSignatureList )
       {
+        System.out.println( "File was signed." );
         KeyFinder keyfinder = eu.getKeyFinder();
         if ( keyfinder == null )
           throw new IOException( "File entry is signed but no public keys were available to verify it." );
@@ -419,7 +421,7 @@ public class EncryptedCompositeFile
         BcPGPContentVerifierBuilderProvider converbuildprov = new BcPGPContentVerifierBuilderProvider();
         inputwrapper.onepasssignature.init( converbuildprov, signerpubkey );
         o = pgpFact.nextObject();
-        System.out.println( "Object class " + o.getClass().toString() );
+        //System.out.println( "Object class " + o.getClass().toString() );
       }
       
       PGPLiteralData ld = (PGPLiteralData) o;
@@ -614,9 +616,6 @@ public class EncryptedCompositeFile
     return pw.toCharArray();
   }
 
-  public static final String passchars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ0123456789.,;:[]}{=+-_)(*&%$";
-
-
   
   
   /**
@@ -700,6 +699,7 @@ public class EncryptedCompositeFile
     PGPOnePassSignatureList onepasssiglist;
     PGPOnePassSignature onepasssignature;
     JcaPGPObjectFactory pgpobjectfactory;
+    boolean closed = false;
     
     long sigcount=0;
     
@@ -724,6 +724,8 @@ public class EncryptedCompositeFile
     @Override
     public void close() throws IOException
     {
+      if ( closed ) return;
+      closed = true;
       if (pbe.isIntegrityProtected())
       {
         try
@@ -733,15 +735,15 @@ public class EncryptedCompositeFile
             System.err.println("message failed integrity check");
           } else
           {
-            //System.err.println("message integrity check passed");
+            System.err.println("message integrity check passed");
           }
         } catch (PGPException ex)
         {
-            System.err.println("unable to run integrity check");
+          System.err.println("unable to run integrity check");
         }
       } else
       {
-        //System.err.println("no message integrity check");
+        System.err.println("no message integrity check");
       }
       closeInputStream();
       literalin.close();
@@ -875,7 +877,7 @@ public class EncryptedCompositeFile
           throw new IOException( "Problem attempting to complete digital signature.", ex );
         }
       }
-      compressingoutput.close();
+      //compressingoutput.close();
       compressiongen.close();  // complete the enclosing compression packet
       encryptedoutput.close(); // complete the enclosing encryption packet
       taroutput.close();       // now close the taroutput which encloses the whole lot.

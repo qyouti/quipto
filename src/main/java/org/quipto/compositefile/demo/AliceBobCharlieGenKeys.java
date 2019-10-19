@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.InvalidKeyException;
+import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Security;
@@ -60,20 +61,37 @@ public class AliceBobCharlieGenKeys
   {
     for ( int i=0; i<aliases.length; i++  )
     {
-      File file = new File("demo/" + aliases[i] + "home/keyring.tar");
+      File dir = new File( "demo/" + aliases[i] + "home" );
+      if ( !dir.exists() )
+        dir.mkdir();
+      File file = new File( dir, "keyring.tar");
       if ( file.exists() )
         file.delete();
       EncryptedCompositeFileUser eu;
       if ( "charlie".equals( aliases[i]) )
-        eu = new EncryptedCompositeFileUser( new WindowsPasswordHandler() );
+      {
+        try 
+        {
+          WindowsPasswordHandler winpasshandler = new WindowsPasswordHandler();
+          eu = new EncryptedCompositeFileUser( winpasshandler );
+        }
+        catch ( KeyStoreException ksex )
+        {
+          eu = null;
+        }
+      }
       else
         eu = new EncryptedCompositeFileUser( new PasswordPasswordHandler( aliases[i] + "@thingy.com", aliases[i].toCharArray() ) );
-      keyringfile[i] = new CompositeFileKeyStore( EncryptedCompositeFile.getCompositeFile( file ), eu );
+      if ( eu != null )
+        keyringfile[i] = new CompositeFileKeyStore( EncryptedCompositeFile.getCompositeFile( file ), eu );
     }
   }
   
   private void storePublicKey( int i, PGPPublicKey key ) throws IOException, PGPException
   {
+    if ( keyringfile[i] == null )
+      return;
+    
     ArrayList<PGPPublicKey> keylist = new ArrayList<>();
     keylist.add(key);
     PGPPublicKeyRing keyring = new PGPPublicKeyRing(keylist);
@@ -85,6 +103,9 @@ public class AliceBobCharlieGenKeys
 
   private void storeSecretKey( int i, PGPSecretKey key ) throws IOException, PGPException
   {
+    if ( keyringfile[i] == null )
+      return;
+    
     ArrayList<PGPSecretKey> keylist = new ArrayList<>();
     keylist.add(key);
     PGPSecretKeyRing keyring = new PGPSecretKeyRing(keylist);
@@ -107,9 +128,12 @@ public class AliceBobCharlieGenKeys
     PGPSecretKey[] secretkey = new PGPSecretKey[aliases.length];
     for ( int i=0; i<aliases.length; i++ )
     {
-      secretkey[i]    = keybuilder.buildSecretKey( aliases[i], QuiptoStandards.SECRET_KEY_STANDARD_PASS );
-      if ( secretkey[i] != null )
-        storeSecretKey( i, secretkey[i] );
+      if ( keyringfile[i] != null )
+      {
+        secretkey[i]    = keybuilder.buildSecretKey( aliases[i], QuiptoStandards.SECRET_KEY_STANDARD_PASS );
+        if ( secretkey[i] != null )
+          storeSecretKey( i, secretkey[i] );
+      }
     }
 
     // sign and store stuff
@@ -118,8 +142,15 @@ public class AliceBobCharlieGenKeys
     storePublicKey( 1, secretkey[0].getPublicKey() );
 
     // Alice and Charlie
-    storePublicKey( 0, secretkey[2].getPublicKey() );
-    storePublicKey( 2, secretkey[0].getPublicKey() );
+    if ( keyringfile[2] != null )
+    {
+      storePublicKey( 0, secretkey[2].getPublicKey() );
+      storePublicKey( 2, secretkey[0].getPublicKey() );
+    }
+    
+    // Alice and Debbie
+    storePublicKey( 0, secretkey[3].getPublicKey() );
+    storePublicKey( 3, secretkey[0].getPublicKey() );
   }
 
    

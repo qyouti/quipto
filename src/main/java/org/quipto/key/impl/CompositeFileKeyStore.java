@@ -67,7 +67,9 @@ public class CompositeFileKeyStore
   {
     try ( InputStream in = compositefile.getDecryptingInputStream(compositefileuser, INDEXFILENAME) )
     {
+      //System.out.println( "loading indices");
       index.loadFromXML(in);
+      //System.out.println( "loaded indices");
     }
     catch (IOException ex)
     {
@@ -172,6 +174,7 @@ public class CompositeFileKeyStore
     if ( !compositefile.exists(filename) )
       return null;
 
+    //System.out.println( "Loading public key ring collection" );
     try ( InputStream in = compositefile.getDecryptingInputStream(compositefileuser, filename) )
     {
       return new PGPPublicKeyRingCollection( in, fingerprintcalc );

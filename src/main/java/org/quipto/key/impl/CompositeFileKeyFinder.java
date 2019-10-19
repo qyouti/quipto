@@ -5,25 +5,17 @@
  */
 package org.quipto.key.impl;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Iterator;
-import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.bouncycastle.bcpg.sig.NotationData;
 import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPPrivateKey;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
 import org.bouncycastle.openpgp.PGPPublicKeyRingCollection;
 import org.bouncycastle.openpgp.PGPSecretKey;
-import org.bouncycastle.openpgp.PGPSecretKeyRing;
 import org.bouncycastle.openpgp.PGPSecretKeyRingCollection;
-import org.bouncycastle.openpgp.PGPSignature;
 import org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator;
 import org.bouncycastle.openpgp.operator.PBESecretKeyDecryptor;
 import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator;
@@ -31,7 +23,6 @@ import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder;
 import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider;
 import org.bouncycastle.util.Arrays;
 import org.quipto.QuiptoStandards;
-import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.key.KeyFinder;
 import org.quipto.key.KeyFinderException;
 
@@ -58,7 +49,10 @@ public class CompositeFileKeyFinder implements KeyFinder
   /**
    * Construct by referencing files containing KeyRingCollections.
    * 
-   * @param tarfile
+   * @param store
+   * @param signingalias
+   * @param encryptingalias
+   * @throws java.io.IOException
    */
   public CompositeFileKeyFinder( CompositeFileKeyStore store, String signingalias, String encryptingalias ) throws IOException
   {
@@ -83,7 +77,9 @@ public class CompositeFileKeyFinder implements KeyFinder
     {
       coll[i] = store.getSecretKeyRingCollection( (i==0)?signingalias:encryptingalias );
       secretkey = coll[i].getKeyRings().next().getSecretKey();
+      //System.out.println( "Extracting private key " );
       privatekey = secretkey.extractPrivateKey( keydecryptor );
+      //System.out.println( "Extraction done." );
       if ( i==0 )
       {
         secretkeyforsigning = secretkey;

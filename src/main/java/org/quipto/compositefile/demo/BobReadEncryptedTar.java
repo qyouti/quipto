@@ -25,6 +25,7 @@ import org.quipto.passwords.PasswordPasswordHandler;
  */
 public class BobReadEncryptedTar
 {
+  static String[] filenames = {"little.txt.gpg"};
 
   /**
    * @param args the command line arguments
@@ -33,7 +34,7 @@ public class BobReadEncryptedTar
   {
     Security.addProvider(new BouncyCastleProvider());    
     PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "bob@thingy.com", "bob".toCharArray() );
-    ReadEncryptedTar.readEncryptedTar( "bob", passhandler, "little.txt.gpg");      
+    ReadEncryptedTar.readEncryptedTar( "bob", passhandler, filenames );
   }
 
 }
