@@ -152,7 +152,13 @@ public class StandardRSAKeyBuilderSigner implements KeyBuilder, KeySigner
     return skr.getSecretKey();
   }
 
-  
+  /**
+   * 
+   * @param signerprivatekey
+   * @param publickey
+   * @param keyflags 
+   * @return 
+   */
   @Override
   public PGPPublicKey signKey(PGPPrivateKey signerprivatekey, PGPPublicKey publickey, int keyflags )
   {

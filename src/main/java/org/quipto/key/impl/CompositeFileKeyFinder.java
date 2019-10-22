@@ -15,6 +15,7 @@ import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
 import org.bouncycastle.openpgp.PGPPublicKeyRingCollection;
 import org.bouncycastle.openpgp.PGPSecretKey;
+import org.bouncycastle.openpgp.PGPSecretKeyRing;
 import org.bouncycastle.openpgp.PGPSecretKeyRingCollection;
 import org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator;
 import org.bouncycastle.openpgp.operator.PBESecretKeyDecryptor;
@@ -32,19 +33,17 @@ import org.quipto.key.KeyFinderException;
  */
 public class CompositeFileKeyFinder implements KeyFinder
 {
+  static final int FORSIGNING = 0;
+  static final int FORENCRYPTING = 1;
   
   KeyFingerPrintCalculator fpcalc = new BcKeyFingerprintCalculator();
   BcPBESecretKeyDecryptorBuilder seckeydecbuilder = new BcPBESecretKeyDecryptorBuilder(  new BcPGPDigestCalculatorProvider() );
   PBESecretKeyDecryptor keydecryptor = seckeydecbuilder.build( QuiptoStandards.SECRET_KEY_STANDARD_PASS );
           
   CompositeFileKeyStore store;
-  String signingalias, encryptingalias;
+  
+  SecretKeyInformation[] secretkeyinfo = new SecretKeyInformation[2];
           
-  PGPSecretKey  secretkeyforsigning;
-  PGPPrivateKey privatekeyforsigning;
-
-  PGPSecretKey  secretkeyforencrypting;
-  PGPPrivateKey privatekeyforencrypting;
   
   /**
    * Construct by referencing files containing KeyRingCollections.
@@ -57,8 +56,10 @@ public class CompositeFileKeyFinder implements KeyFinder
   public CompositeFileKeyFinder( CompositeFileKeyStore store, String signingalias, String encryptingalias ) throws IOException
   {
     this.store = store;
-    this.signingalias = signingalias;
-    this.encryptingalias = encryptingalias;
+    secretkeyinfo[FORSIGNING] = new SecretKeyInformation();
+    secretkeyinfo[FORENCRYPTING] = new SecretKeyInformation();
+    secretkeyinfo[FORSIGNING].alias = signingalias;
+    secretkeyinfo[FORENCRYPTING].alias = encryptingalias;
   }
 
   
@@ -70,26 +71,27 @@ public class CompositeFileKeyFinder implements KeyFinder
    */
   public void init() throws IOException, PGPException
   {
-    PGPSecretKeyRingCollection[] coll = new PGPSecretKeyRingCollection[2];
-    PGPSecretKey secretkey;
-    PGPPrivateKey privatekey;
-    for ( int i=0; i<2; i++ )
+    PGPSecretKeyRing[] keyrings = new PGPSecretKeyRing[2];
+    for ( int i=FORSIGNING; i<=FORENCRYPTING; i++ )
     {
-      coll[i] = store.getSecretKeyRingCollection( (i==0)?signingalias:encryptingalias );
-      secretkey = coll[i].getKeyRings().next().getSecretKey();
-      //System.out.println( "Extracting private key " );
-      privatekey = secretkey.extractPrivateKey( keydecryptor );
-      //System.out.println( "Extraction done." );
-      if ( i==0 )
+      if ( secretkeyinfo[i].alias != null )
       {
-        secretkeyforsigning = secretkey;
-        privatekeyforsigning = privatekey;
-      }
-      if ( i==1 || signingalias.equals( encryptingalias ) )
-      {
-        secretkeyforencrypting = secretkey;
-        privatekeyforencrypting = privatekey;
-        break;
+        keyrings[i] = store.getSecretKeyRing( secretkeyinfo[i].alias );
+        if ( keyrings[i] != null )
+        {
+          secretkeyinfo[i].secretkey = CompositeFileKeyStore.getMasterSecretKey(keyrings[i]);
+          if ( secretkeyinfo[i].secretkey != null )
+          {
+            //System.out.println( "Extracting private key " );
+            secretkeyinfo[i].privatekey = secretkeyinfo[i].secretkey.extractPrivateKey( keydecryptor );
+            if ( i==FORSIGNING && secretkeyinfo[FORSIGNING].alias.equals( secretkeyinfo[FORENCRYPTING].alias ) )
+            {
+              secretkeyinfo[FORENCRYPTING].secretkey = secretkeyinfo[FORSIGNING].secretkey;
+              secretkeyinfo[FORENCRYPTING].privatekey = secretkeyinfo[FORSIGNING].privatekey;
+              break;
+            }
+          }
+        }
       }
     }
   }
@@ -117,8 +119,8 @@ public class CompositeFileKeyFinder implements KeyFinder
   @Override
   public PGPPrivateKey getPrivateKey( PGPSecretKey secretkey )
   {
-    if ( secretkey == secretkeyforsigning )
-      return privatekeyforsigning;
+    if ( secretkey == secretkeyinfo[FORSIGNING].secretkey )
+      return secretkeyinfo[FORSIGNING].privatekey;
     return null;
   }
   
@@ -129,7 +131,7 @@ public class CompositeFileKeyFinder implements KeyFinder
   @Override
   public PGPSecretKey getSecretKeyForDecryption()
   {
-    return secretkeyforsigning;
+    return secretkeyinfo[FORENCRYPTING].secretkey;
   }
   
   /**
@@ -139,7 +141,7 @@ public class CompositeFileKeyFinder implements KeyFinder
   @Override
   public PGPSecretKey getSecretKeyForSigning()
   {
-    return secretkeyforsigning;    
+    return secretkeyinfo[FORSIGNING].secretkey;
   }
 
   /**
@@ -150,17 +152,9 @@ public class CompositeFileKeyFinder implements KeyFinder
   @Override
   public PGPPublicKey findPublicKey(long keyid)
   {
-    PGPPublicKeyRingCollection coll = store.getPublicKeyRingCollection( keyid );
-    if ( coll == null ) return null;
-    try
-    {
-      return coll.getPublicKey(keyid);
-    }
-    catch (PGPException ex)
-    {
-      Logger.getLogger(CompositeFileKeyFinder.class.getName()).log(Level.SEVERE, null, ex);
-    }
-    return null;
+    PGPPublicKeyRing keyring = store.getPublicKeyRing( keyid );
+    if ( keyring == null ) return null;
+    return keyring.getPublicKey(keyid);
   }
 
   /**
@@ -210,9 +204,24 @@ public class CompositeFileKeyFinder implements KeyFinder
    */
   public PGPPublicKey findFirstPublicKey( String userid )
   {
-    PGPPublicKeyRingCollection coll = store.getPublicKeyRingCollection( userid );
-    if ( coll == null ) return null;
-    PGPPublicKeyRing keyring = coll.getKeyRings().next();
-    return keyring.getPublicKeys().next();
+    PGPPublicKeyRing keyring = store.getPublicKeyRing( userid );
+    if ( keyring == null ) return null;
+    Iterator<PGPPublicKey> iter = keyring.getPublicKeys();
+    while ( iter.hasNext() )
+    {
+      PGPPublicKey key = iter.next();
+      Iterator<String> uiter = key.getUserIDs();
+      while ( uiter.hasNext() )
+        if ( uiter.next().equals(userid ) )
+          return key;
+    }
+    return null;
+  }
+  
+  private class SecretKeyInformation
+  {
+    String alias;
+    PGPSecretKey  secretkey;
+    PGPPrivateKey privatekey;
   }
 }

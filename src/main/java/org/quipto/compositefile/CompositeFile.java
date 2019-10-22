@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileLock;
 import java.util.HashMap;
+import java.util.Set;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarConstants;
@@ -177,7 +178,10 @@ public class CompositeFile
       return entry != null;
     }
     
-    
+    public Set<String> getComponentNames()
+    {
+      return componentmap.keySet();
+    }
     
     /**
      * Initialise an InputStream which will read the contents of an entry.

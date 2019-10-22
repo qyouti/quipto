@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Leeds Beckett University.
+ * Copyright 2019 jon.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,25 +16,29 @@
 package org.quipto.compositefile.demo;
 
 import java.security.Security;
+
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.quipto.passwords.PasswordPasswordHandler;
 
 /**
- * Bob will read an entry in the demo encrypted composite file that was created by Alice.
- * @author maber01
+ * One user certifies the keys of other users.
  */
-public class AliceReadEncryptedTar
+public class Demo32DebbieCertifyBob
 {
-  static String[] filenames = {"little.txt.gpg"};
-
+  static final String[] subjectaliases = { "bob" };
+  static final boolean[] addtoteam = { false };
+  
   /**
-   * @param args the command line arguments
+   * Run the demo.
+   * @param args No arguments used.
+   * @throws Exception 
    */
-  public static void main(String[] args)
+  public static void main(
+          String[] args)
+          throws Exception
   {
-    Security.addProvider(new BouncyCastleProvider());    
-    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "alice@thingy.com", "alice".toCharArray() );
-    ReadEncryptedTar.readEncryptedTar( "alice", passhandler, filenames );
+    Security.addProvider(new BouncyCastleProvider());
+    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "debbie@thingy.com", "debbie".toCharArray() );
+    SignKeys.signKeysAndImport("debbie", passhandler, false, subjectaliases, addtoteam );
   }
-
 }

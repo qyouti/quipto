@@ -36,7 +36,7 @@ import org.quipto.trust.impl.TrustAnythingContext;
  * 
  * @author maber01
  */
-public class BobWriteToEncryptedTar
+public class Demo34BobWriteToEncryptedTar
 {
 
   /**

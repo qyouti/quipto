@@ -11,7 +11,7 @@ import java.io.File;
  *
  * @author jon
  */
-public class RemoveDemoFiles
+public class Demo00RemoveDemoFiles
 {
 
   public static void removeFiles( File directory )

@@ -52,7 +52,7 @@ import org.quipto.trust.impl.TrustAnythingContext;
  * 
  * @author maber01
  */
-public class CharlieReadEncryptedTar
+public class Demo24CharlieReadEncryptedTar
 {
   static String[] filenames = {"little.txt.gpg"};
   /**

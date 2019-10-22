@@ -7,28 +7,26 @@ package org.quipto.trust.team;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.bouncycastle.openpgp.PGPEncryptedDataList;
+import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPPrivateKey;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
 import org.bouncycastle.openpgp.PGPSecretKey;
 import org.bouncycastle.openpgp.PGPSignature;
-import org.bouncycastle.openpgp.PGPUtil;
-import org.bouncycastle.openpgp.jcajce.JcaPGPObjectFactory;
-import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator;
 import org.quipto.compositefile.EncryptedCompositeFile;
+import org.quipto.compositefile.EncryptedCompositeFilePasswordHandler;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
 import org.quipto.key.KeyFinder;
 import org.quipto.key.KeyFinderException;
-import org.quipto.key.impl.OldPGPFileKeyFinder;
+import org.quipto.key.impl.CompositeFileKeyFinder;
+import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.trust.TrustContext;
 import org.quipto.trust.TrustContextException;
 import org.quipto.trust.TrustContextReport;
@@ -40,19 +38,33 @@ import org.quipto.trust.impl.TrustAnythingContext;
  */
 public class TeamTrust implements TrustContext, KeyFinder
 {
-  File basefile;
-  EncryptedCompositeFile compositebasefile;
-  EncryptedCompositeFileUser encfileuser;
-  OldPGPFileKeyFinder keyfinder;
+  static final int PERSONAL = 0;
+  static final int TEAM     = 1;
+  
+  EncryptedCompositeFileUser[] eu = new EncryptedCompositeFileUser[2];
+  CompositeFileKeyStore[] keystore = new CompositeFileKeyStore[2];
+  CompositeFileKeyFinder[] keyfinder = new CompositeFileKeyFinder[2];
 
-  public TeamTrust(File basefile, OldPGPFileKeyFinder keyfinder)
+  public TeamTrust( String alias, EncryptedCompositeFilePasswordHandler passhandler, File personalkeystorefile, File teamkeystorefile ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, PGPException
   {
-    this.basefile = basefile;
-    this.keyfinder = keyfinder;
     try
     {
-      compositebasefile = EncryptedCompositeFile.getCompositeFile( basefile );
-      encfileuser = new EncryptedCompositeFileUser( keyfinder, new TrustAnythingContext() );
+      File[] files = new File[2];
+      files[0] = personalkeystorefile;
+      files[1] = teamkeystorefile;
+      eu[PERSONAL] = new EncryptedCompositeFileUser( passhandler );  // personal store uses password
+      eu[TEAM]     = new EncryptedCompositeFileUser( keyfinder[0], new TrustAnythingContext() ); // shared store uses key from personal store
+      for ( int i=0; i<2; i++ )
+      {
+        EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile( files[i] );
+        if ( i==PERSONAL )
+          eu[PERSONAL] = new EncryptedCompositeFileUser( passhandler );  // personal store uses password
+        if ( i==TEAM )
+          eu[TEAM]     = new EncryptedCompositeFileUser( keyfinder[PERSONAL], new TrustAnythingContext() ); // shared store uses key from personal store        
+        keystore[i] = new CompositeFileKeyStore( compfile, eu[i] );
+        keyfinder[i] = new CompositeFileKeyFinder( keystore[i], alias, alias );
+        keyfinder[i].init();
+      }
     }
     catch (IOException ex)
     {
@@ -60,63 +72,37 @@ public class TeamTrust implements TrustContext, KeyFinder
     }
   }
 
-  public void init()
+  public void close()
   {
-    // Create various empty files in the archive....
+    for ( int i=PERSONAL; i<TEAM; i++ )
+      if ( keystore[i] != null )
+        keystore[i].close();
   }
   
-  public void load()
+  public void addPublicKeyToTeamStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    
+    ArrayList<PGPPublicKey> list = new ArrayList<>();
+    list.add(publickey);
+    keystore[TEAM].addAccessToPublicKey(publickey);
+    keystore[TEAM].setPublicKeyRing( new PGPPublicKeyRing(list) );
   }
   
-  public void addPublicKeyToTeam( PGPPublicKey publickey )
+  public void addPublicKeyToPersonalStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    PGPPublicKey currentpublickey = loadPublicKey( publickey.getKeyID() );
-    try
-    {
-      compositebasefile.addPublicKey(encfileuser, publickey);
-    }
-    catch (IOException | NoSuchProviderException | NoSuchAlgorithmException ex)
-    {
-      Logger.getLogger(TeamTrust.class.getName()).log(Level.SEVERE, null, ex);
-    }
-    savePublicKey( publickey );
+    ArrayList<PGPPublicKey> list = new ArrayList<>();
+    list.add(publickey);
+    keystore[PERSONAL].setPublicKeyRing( new PGPPublicKeyRing(list) );
   }
   
-  private void savePublicKey( PGPPublicKey publickey )
+  public void addAllTeamKeysToEncryptedCompositeFile( EncryptedCompositeFile compositefile, EncryptedCompositeFileUser eu ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    String name = "publickeys/" + Long.toHexString(publickey.getKeyID()) + ".pgp";
-    try (OutputStream output = compositebasefile.getEncryptingOutputStream(encfileuser, name, true, false))
+    List<PGPPublicKeyRing> fulllist = keystore[TEAM].getAllPublicKeyRings();
+    for ( PGPPublicKeyRing keyring : fulllist )
     {
-      byte[] enckey = publickey.getEncoded();
-      output.write(enckey);
-    }
-    catch (IOException ex)
-    {
-      Logger.getLogger(TeamTrust.class.getName()).log(Level.SEVERE, null, ex);
+      keyring.getPublicKey();  // the master key
+      compositefile.addPublicKey( eu, keyring.getPublicKey() );
     }
   }
-  
-  private PGPPublicKey loadPublicKey( long keyid )
-  {
-    String name = "publickeys/" + Long.toHexString(keyid) + ".pgp";
-    if ( !compositebasefile.exists( name ) )
-      return null; 
-    try ( InputStream in = compositebasefile.getDecryptingInputStream(encfileuser, name); )
-    {
-      PGPPublicKeyRing keyring = new PGPPublicKeyRing( in, new BcKeyFingerprintCalculator() );
-      if ( keyring == null )
-        return null;
-      return keyring.getPublicKey();
-    }
-    catch (IOException ex)
-    {
-      Logger.getLogger(TeamTrust.class.getName()).log(Level.SEVERE, null, ex);
-      return null;
-    }
-  }
-  
   
   @Override
   public TrustContextReport checkTrusted( long signerkeyid )
@@ -146,7 +132,7 @@ public class TeamTrust implements TrustContext, KeyFinder
           throws TrustContextException
   {
     // Just load them by keyid without verification or other checks
-    PGPPublicKey publickey = null;
+    PGPPublicKey publickey;
     Iterator<PGPSignature> sigiter;
     PGPSignature sig;
     ArrayList<PGPPublicKey> list = new ArrayList<>();
@@ -155,7 +141,7 @@ public class TeamTrust implements TrustContext, KeyFinder
     long keyid = signerkeyid;
     do
     {
-      publickey = loadPublicKey( keyid );
+      publickey = keyfinder[TEAM].findPublicKey( keyid );
       if ( publickey == null )
         throw new TrustContextException( new TrustContextReport( false, "Signing key that is not listed in the Trust file." ) );
       sigiter = publickey.getSignatures();
@@ -186,50 +172,62 @@ public class TeamTrust implements TrustContext, KeyFinder
   @Override
   public String getPreferredAlias(PGPSecretKey secretkey)
   {
-    return keyfinder.getPreferredAlias(secretkey);
+    return keyfinder[PERSONAL].getPreferredAlias(secretkey);
   }
 
   @Override
   public PGPPrivateKey getPrivateKey(PGPSecretKey secretkey)
   {
-    return keyfinder.getPrivateKey(secretkey);
+    return keyfinder[PERSONAL].getPrivateKey(secretkey);
   }
 
   @Override
   public PGPSecretKey getSecretKeyForDecryption()
   {
-    return keyfinder.getSecretKeyForDecryption();
+    return keyfinder[PERSONAL].getSecretKeyForDecryption();
   }
 
   @Override
   public PGPSecretKey getSecretKeyForSigning()
   {
-    return keyfinder.getSecretKeyForSigning();
+    return keyfinder[PERSONAL].getSecretKeyForSigning();
   }
 
   @Override
   public PGPPublicKey findPublicKey(long keyid)
   {
-    return keyfinder.findPublicKey(keyid);
+    PGPPublicKey pubkey = keyfinder[TEAM].findPublicKey(keyid);
+    if ( pubkey != null )
+      return pubkey;
+    return keyfinder[PERSONAL].findPublicKey(keyid);
   }
 
   @Override
   public PGPPublicKey findPublicKey(long keyid, String userid)
   {
-    return keyfinder.findPublicKey(keyid,userid);
+    PGPPublicKey pubkey = keyfinder[TEAM].findPublicKey(keyid,userid);
+    if ( pubkey != null )
+      return pubkey;
+    return keyfinder[PERSONAL].findPublicKey(keyid,userid);
   }
 
   @Override
   public PGPPublicKey findPublicKey(long keyid, String userid, byte[] fingerprint)
           throws KeyFinderException
   {
-    return keyfinder.findPublicKey(keyid,userid,fingerprint);
+    PGPPublicKey pubkey = keyfinder[TEAM].findPublicKey(keyid,userid,fingerprint);
+    if ( pubkey != null )
+      return pubkey;
+    return keyfinder[PERSONAL].findPublicKey(keyid,userid,fingerprint);
   }
 
   @Override
   public PGPPublicKey findFirstPublicKey(String userid)
   {
-    return keyfinder.findFirstPublicKey(userid);
+    PGPPublicKey pubkey = keyfinder[TEAM].findFirstPublicKey(userid);
+    if ( pubkey != null )
+      return pubkey;
+    return keyfinder[PERSONAL].findFirstPublicKey(userid);
   }
   
 }

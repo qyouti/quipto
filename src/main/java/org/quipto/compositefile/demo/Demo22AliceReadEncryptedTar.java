@@ -23,9 +23,9 @@ import org.quipto.passwords.PasswordPasswordHandler;
  * Bob will read an entry in the demo encrypted composite file that was created by Alice.
  * @author maber01
  */
-public class BobReadEncryptedTar
+public class Demo22AliceReadEncryptedTar
 {
-  static String[] filenames = {"little.txt.gpg"};
+  static String[] filenames = {"little.txt"};
 
   /**
    * @param args the command line arguments
@@ -33,8 +33,8 @@ public class BobReadEncryptedTar
   public static void main(String[] args)
   {
     Security.addProvider(new BouncyCastleProvider());    
-    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "bob@thingy.com", "bob".toCharArray() );
-    ReadEncryptedTar.readEncryptedTar( "bob", passhandler, filenames );
+    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "alice@thingy.com", "alice".toCharArray() );
+    ReadEncryptedTar.readEncryptedTar( "alice", passhandler, filenames );
   }
 
 }

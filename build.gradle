@@ -16,43 +16,10 @@ dependencies {
     testCompile 'junit:junit:4.12'
 }
 
-task runAliceBobCharlieGenKeys(type: JavaExec){
+task runDemo01UsersGenerateOwnKeys(type: JavaExec){
     description = "Create key pairs for composite file demo"
     classpath = sourceSets.main.runtimeClasspath
-    main = 'org.quipto.compositefile.demo.AliceBobCharlieGenKeys'
-    jvmArgs '-Djava.library.path=..\\winselfcert\\winselfcertdll\\dist\\Release\\Cygwin-Windows'
-}
-
-task runAliceMakeEncryptedTar(type: JavaExec){
-    description = "Demo user Alice creates an encrypted tar file"
-    classpath = sourceSets.main.runtimeClasspath
-    main = 'org.quipto.compositefile.demo.AliceMakeEncryptedTar'
-}
-
-task runAliceMakePrivateEncryptedTar(type: JavaExec){
-    description = "Demo user Alice creates an encrypted tar file for her own private use."
-    classpath = sourceSets.main.runtimeClasspath
-    main = 'org.quipto.compositefile.demo.AliceMakePrivateEncryptedTar'
-    jvmArgs '-Djava.library.path=..\\winselfcert\\winselfcertdll\\dist\\Release\\Cygwin-Windows'
-}
-
-task runAliceReadPrivateEncryptedTar(type: JavaExec){
-    description = "Demo user Alice creates an encrypted tar file for her own private use."
-    classpath = sourceSets.main.runtimeClasspath
-    main = 'org.quipto.compositefile.demo.AliceReadPrivateEncryptedTar'
-    jvmArgs '-Djava.library.path=..\\winselfcert\\winselfcertdll\\dist\\Release\\Cygwin-Windows'
-}
-
-task runBobReadEncryptedTar(type: JavaExec){
-    description = "Demo user Bob reads the file Alice created"
-    classpath = sourceSets.main.runtimeClasspath
-    main = 'org.quipto.compositefile.demo.BobReadEncryptedTar'
-}
-
-task runCharlieReadEncryptedTar(type: JavaExec){
-    description = "Demo user Charlie (who stores his key password using Windows encryption) reads the file Alice created"
-    classpath = sourceSets.main.runtimeClasspath
-    main = 'org.quipto.compositefile.demo.CharlieReadEncryptedTar'
+    main = 'org.quipto.compositefile.demo.Demo01UsersGenerateOwnKeys'
     jvmArgs '-Djava.library.path=..\\winselfcert\\winselfcertdll\\dist\\Release\\Cygwin-Windows'
 }
 
