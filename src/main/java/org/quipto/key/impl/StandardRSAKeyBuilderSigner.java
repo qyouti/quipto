@@ -8,6 +8,7 @@ package org.quipto.key.impl;
 import java.math.BigInteger;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.logging.Level;
@@ -46,7 +47,9 @@ import org.quipto.key.KeySigner;
  */
 public class StandardRSAKeyBuilderSigner implements KeyBuilder, KeySigner
 {
- 
+  public static final int INCLUDE_NO_OLD_SIGNATURES = 0;
+  public static final int INCLUDE_SELF_SIGNATURE    = 1;
+  public static final int INCLUDE_ALL_SIGNATURES    = 2;
   
   /**
    * 
@@ -160,18 +163,29 @@ public class StandardRSAKeyBuilderSigner implements KeyBuilder, KeySigner
    * @return 
    */
   @Override
-  public PGPPublicKey signKey(PGPPrivateKey signerprivatekey, PGPPublicKey publickey, int keyflags )
+  public PGPPublicKey signKey(PGPPrivateKey signerprivatekey, PGPPublicKey publickey, int keyflags, int include )
   {
-    
     try
     {
-      // make a copy without signatures
-      PGPPublicKey signedpublickey = new PGPPublicKey( publickey.getPublicKeyPacket(), new BcKeyFingerprintCalculator() );
-      // get self signatures only
-      Iterator<PGPSignature> selfsigiter = publickey.getSignaturesForKeyID( publickey.getKeyID() );
-      // add them to the new copy
-      while ( selfsigiter.hasNext() )
-        PGPPublicKey.addCertification( signedpublickey, selfsigiter.next() );
+      PGPPublicKey signedpublickey = publickey;
+      if ( include == INCLUDE_NO_OLD_SIGNATURES || include == INCLUDE_SELF_SIGNATURE )
+      {
+        ArrayList<PGPSignature> sigsforremoval = new ArrayList<>();
+        Iterator<PGPSignature> iter = publickey.getSignatures();
+        while ( iter.hasNext() )
+        {
+          PGPSignature sig = iter.next();
+          if ( sig.getKeyID() == publickey.getKeyID() )
+          {
+            if ( include != INCLUDE_SELF_SIGNATURE )
+              sigsforremoval.add(sig);
+          }
+          else
+            sigsforremoval.add(sig);
+        }
+        for ( PGPSignature sig : sigsforremoval )
+          signedpublickey = PGPPublicKey.removeCertification(signedpublickey, sig);
+      }
 
       PGPSignatureSubpacketGenerator signhashgen = new PGPSignatureSubpacketGenerator();
       signhashgen.setKeyFlags(false, keyflags );
@@ -181,7 +195,7 @@ public class StandardRSAKeyBuilderSigner implements KeyBuilder, KeySigner
       siggen.setHashedSubpackets(signhashgen.generate());
       siggen.init(PGPSignature.DIRECT_KEY, signerprivatekey);
       PGPSignature signature = siggen.generateCertification(signedpublickey);
-      PGPPublicKey.addCertification( signedpublickey, signature );      
+      signedpublickey = PGPPublicKey.addCertification( signedpublickey, signature );
       return signedpublickey;
     }
     catch (PGPException ex)

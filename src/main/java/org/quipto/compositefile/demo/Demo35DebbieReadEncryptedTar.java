@@ -25,7 +25,7 @@ import org.quipto.passwords.PasswordPasswordHandler;
  */
 public class Demo35DebbieReadEncryptedTar
 {
-  static String[] filenames = {"little.txt.gpg","bobs contribution.txt.gpg"};
+  static String[] filenames = {"bobscontribution.txt","little.txt"};
   
   /**
    * @param args the command line arguments

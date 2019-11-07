@@ -14,5 +14,5 @@ import org.bouncycastle.openpgp.PGPPublicKey;
  */
 public interface KeySigner
 {
-  public PGPPublicKey signKey( PGPPrivateKey signingkey, PGPPublicKey publickey, int keyflags );
+  public PGPPublicKey signKey( PGPPrivateKey signingkey, PGPPublicKey publickey, int keyflags, int include );
 }

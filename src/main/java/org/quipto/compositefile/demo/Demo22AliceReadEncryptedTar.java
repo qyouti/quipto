@@ -20,7 +20,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.quipto.passwords.PasswordPasswordHandler;
 
 /**
- * Bob will read an entry in the demo encrypted composite file that was created by Alice.
+ * Alice will read an entry in the demo encrypted composite file that she created.
  * @author maber01
  */
 public class Demo22AliceReadEncryptedTar

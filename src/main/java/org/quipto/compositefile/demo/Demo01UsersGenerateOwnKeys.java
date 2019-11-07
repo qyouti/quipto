@@ -40,9 +40,8 @@ import org.quipto.passwords.WindowsPasswordHandler;
 
 /**
  * Generates RSA PGPPublicKey/PGPSecretKey pairs for demos.
- * Alice and Bob get PGP key pairs stored in their secret key rings. The
- * two public keys are put into Alice, Bob and Charlie's public key rings.
- * (Charlie will use Windows CAPI for his key pair.)
+ * Charlie uses a Windows key pair to keep his password. All
+ * the others need to use a password every time.
  */
 public class Demo01UsersGenerateOwnKeys
 {
@@ -76,7 +75,12 @@ public class Demo01UsersGenerateOwnKeys
     else
       eu = new EncryptedCompositeFileUser( new PasswordPasswordHandler( alias + "@thingy.com", alias.toCharArray() ) );
     if ( eu != null )
-      return new CompositeFileKeyStore( EncryptedCompositeFile.getCompositeFile( file ), eu );
+    {
+      CompositeFileKeyStore keystore = new CompositeFileKeyStore( EncryptedCompositeFile.getCompositeFile( file ) );
+      keystore.setCompositeFileUser( eu );
+      keystore.addAccessToCustomUser();  // add access to self
+      return keystore;
+    }
     return null;
   }
   
@@ -118,57 +122,21 @@ public class Demo01UsersGenerateOwnKeys
   private void run()
           throws Exception
   {
-    File dir = new File( "demo/shared" );
-    if ( !dir.exists() )
-      dir.mkdir();
-    
-    File file = new File( dir, "teamkeyring.tar");
-    if ( file.exists() )
-      file.delete();
-    
     Security.addProvider(new BouncyCastleProvider());
-
     
     StandardRSAKeyBuilderSigner keybuilder = new StandardRSAKeyBuilderSigner();    
-    PGPSecretKey[] secretkey = new PGPSecretKey[aliases.length];
-    for ( int i=0; i<aliases.length; i++ )
+    
+    for (String alias : aliases)
     {
-      CompositeFileKeyStore keystore = createKeyRing( aliases[i] );
-      if ( keystore != null )
+      CompositeFileKeyStore keystore = createKeyRing(alias);
+      if (keystore != null)
       {
-        secretkey[i]    = keybuilder.buildSecretKey( aliases[i], QuiptoStandards.SECRET_KEY_STANDARD_PASS );
-        if ( secretkey[i] != null )
-          storeSecretKey( aliases[i], keystore, secretkey[i] );
+        PGPSecretKey secretkey = keybuilder.buildSecretKey(alias, QuiptoStandards.SECRET_KEY_STANDARD_PASS);
+        if (secretkey != null)
+          storeSecretKey(alias, keystore, secretkey);
         keystore.close();
       }
     }
-
-    // sign and store stuff
-    // Alice and Bob trust each other to sign....
-    //storePublicKey( 0, secretkey[1].getPublicKey() );
-    //storePublicKey( 1, secretkey[0].getPublicKey() );
-
-    // Alice and Charlie
-    //if ( keyringfile[2] != null )
-    //{
-    //  storePublicKey( 0, secretkey[2].getPublicKey() );
-    //  storePublicKey( 2, secretkey[0].getPublicKey() );
-    //}
-    
-    // Alice and Debbie
-//    storePublicKey( 0, secretkey[3].getPublicKey() );
-//    storePublicKey( 3, secretkey[0].getPublicKey() );
-    
-    
-//    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( aliases[0] + "@thingy.com", aliases[0].toCharArray() );
-//    TeamTrust teamtrust = new TeamTrust( aliases[0], passhandler, new File( "demo/" + aliases[0] + "home/keyring.tar" ), file );
-//    
-//    PGPSecretKey alicesecretkey = teamtrust.getSecretKeyForSigning();
-//    PGPPrivateKey aliceprivatekey = teamtrust.getPrivateKey(alicesecretkey);
-//    PGPPublicKey alicesignedbob = keybuilder.signKey( aliceprivatekey, secretkey[1].getPublicKey(),  KeyFlags.SIGN_DATA|KeyFlags.ENCRYPT_STORAGE|KeyFlags.CERTIFY_OTHER);
-//    
-//    for ( int i=0; i<aliases.length; i++  )
-//      teamtrust.addPublicKeyToTeam( secretkey[i].getPublicKey() );
   }
 
    

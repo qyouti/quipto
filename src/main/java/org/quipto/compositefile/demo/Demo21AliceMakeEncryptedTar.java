@@ -46,64 +46,9 @@ public class Demo21AliceMakeEncryptedTar
    */
   public static void main(String[] args)
   {
-    
-    Security.addProvider(new BouncyCastleProvider());    
+    Security.addProvider(new BouncyCastleProvider());
     PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "alice@thingy.com", "alice".toCharArray() );
     WriteEncryptedTar.writeEncryptedTar("alice", passhandler, filenames, big);
-    
-//    int i;
-//    byte[] buffer = "The quick brown fox jumps over the lazy dog. \n".getBytes();
-//
-//    Security.addProvider(new BouncyCastleProvider());
-//
-//    try
-//    {
-//      File dir = new File( "demo/shared" );
-//      if ( !dir.exists() )
-//        dir.mkdir();
-//      File file = new File(dir, "mydataenc.tar");
-//      if ( file.exists() )
-//        file.delete();
-//      
-//      String alicealias = "alice";
-//      EncryptedCompositeFileUser alicekeystoreeu = new EncryptedCompositeFileUser( new PasswordPasswordHandler( "alice@thingy.com", "alice".toCharArray() ) );
-//      CompositeFileKeyStore keyringstore = new CompositeFileKeyStore( EncryptedCompositeFile.getCompositeFile( new File("demo/alicehome/keyring.tar") ), alicekeystoreeu );
-//      CompositeFileKeyFinder keyfinder = new CompositeFileKeyFinder( keyringstore, alicealias, alicealias );
-//      keyfinder.init();
-//      PGPSecretKey secretkey = keyfinder.getSecretKeyForDecryption();
-//      PGPPublicKey bobkey = keyfinder.findFirstPublicKey("bob");
-//      if ( bobkey == null )
-//        throw new IOException( "Can't find Bob's public key.");
-//      PGPPublicKey charliekey = keyfinder.findFirstPublicKey("charlie");
-//      PGPPublicKey debbiekey = keyfinder.findFirstPublicKey("debbie");
-//      if ( debbiekey == null )
-//        throw new IOException( "Can't find Debbie's public key.");
-//      
-//      EncryptedCompositeFileUser alice = new EncryptedCompositeFileUser( keyfinder, new TrustAnythingContext() );
-//      EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
-//      compfile.addPublicKey( alice, secretkey.getPublicKey() );
-//      compfile.addPublicKey( alice, bobkey );
-//      if ( charliekey != null )
-//        compfile.addPublicKey( alice, charliekey );
-//      compfile.addPublicKey( alice, debbiekey );
-//      
-//      OutputStream out;
-//      out = compfile.getEncryptingOutputStream( alice, "bigdatafile.bin.gpg", false, true );
-//      for (i = 0; i < 202; i++)
-//        out.write(buffer);
-//      out.close();
-//
-//      
-//      buffer = "Mary had a little lamb, its fleece was white as snow and everywhere that Mary went the lamb was sure to go. \n".getBytes();      
-//      out = compfile.getEncryptingOutputStream( alice, "little.txt.gpg", false, true );
-//      out.write(buffer);
-//      out.close();
-//      compfile.close();
-//
-//    } catch (Exception ex)
-//    {
-//      ex.printStackTrace();
-//    }
   }
 
 }

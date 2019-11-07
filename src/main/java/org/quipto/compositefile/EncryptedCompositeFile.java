@@ -343,6 +343,73 @@ public class EncryptedCompositeFile
   }
 
   /**
+   * Opens the file and reads enough encrypted data to find the PGPOnePassSignatureList and obtain the
+   * signer's key id. Then prematurely closes the stream. Then fetches the public key from the ID, possibly
+   * from the same tar file as the signed data. Then the entry can be reopened to read the data and check the
+   * signature against the loaded key.
+   * This is all done so signed files and keys can be kept in the same tar file.
+   * 
+   * @param eu
+   * @param name
+   * @param passphrase
+   * @return 
+   */
+  private synchronized PGPPublicKey getSignerPublicKey( EncryptedCompositeFileUser eu, String name, char[] passphrase ) throws IOException
+  {
+    long signerkeyid;
+    
+    try ( InputStream  tarin = super.getInputStream(name) )
+    {
+      InputStream in = PGPUtil.getDecoderStream(tarin);
+      JcaPGPObjectFactory pgpF = new JcaPGPObjectFactory(in);
+      PGPEncryptedDataList enc;
+      Object o = pgpF.nextObject();
+      //System.out.println( "o = " + o.getClass() );
+      if (o instanceof PGPEncryptedDataList)
+        enc = (PGPEncryptedDataList) o;
+      else
+      {
+        enc = (PGPEncryptedDataList) pgpF.nextObject();
+        //System.out.println( "o = " + o.getClass() );
+      }
+      PGPPBEEncryptedData pbe = (PGPPBEEncryptedData) enc.get(0);
+      InputStream clearin = pbe.getDataStream(
+              new JcePBEDataDecryptorFactoryBuilder(
+                      new JcaPGPDigestCalculatorProviderBuilder().setProvider("BC").build()
+              ).setProvider("BC").build(passphrase) );
+      JcaPGPObjectFactory pgpFact = new JcaPGPObjectFactory(clearin);
+      o = pgpFact.nextObject();
+      //System.out.println( "Object class " + o.getClass().toString() );
+      if (o instanceof PGPCompressedData)
+      {
+        PGPCompressedData cData = (PGPCompressedData) o;        
+        pgpFact = new JcaPGPObjectFactory(cData.getDataStream());
+        o = pgpFact.nextObject();
+      }
+      //System.out.println( "Object class " + o.getClass().toString() );
+      
+      if ( !(o instanceof PGPOnePassSignatureList) )
+        return null;
+      
+      System.out.println( "File was signed." );
+      PGPOnePassSignatureList onepasssiglist = (PGPOnePassSignatureList)o;
+      if ( onepasssiglist.size() != 1 )
+        throw new IOException( "Invalid Signature Format in data file." );
+      PGPOnePassSignature onepasssignature = onepasssiglist.get(0);
+      signerkeyid = onepasssignature.getKeyID();  
+    } catch (PGPException ex)
+    {
+      Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
+      return null;
+    }
+    // input stream is closed, ready to read from same store if necessary.
+    PGPPublicKey signerpubkey = eu.getKeyFinder().findPublicKey(signerkeyid);
+    if ( signerpubkey == null )
+      throw new IOException( "Unable to find public key used to sign this data file. Name = '" + name + "', signature key id = '" + Long.toHexString(signerkeyid) + "'." );        
+    return signerpubkey;
+  }
+  
+  /**
    * Get input stream to read data from an entry.The data will be decrypted before being delivered to the
  stream.
    * 
@@ -367,6 +434,8 @@ public class EncryptedCompositeFile
     char[] passphrase = eu.getPassPhrase(getCanonicalPath());
     if ( passphrase == null )
       throw new IOException("Unable to initialise decryption input because no pass phrase has been generated.");
+    
+    PGPPublicKey signerpublickey = getSignerPublicKey( eu, name, passphrase );
     
     EncryptedInputWrapper inputwrapper = new EncryptedInputWrapper();
     try ( InputStream  tarin = super.getInputStream(name) )
@@ -402,24 +471,19 @@ public class EncryptedCompositeFile
       
       if ( o instanceof PGPOnePassSignatureList )
       {
-        System.out.println( "File was signed." );
-        KeyFinder keyfinder = eu.getKeyFinder();
-        if ( keyfinder == null )
-          throw new IOException( "File entry is signed but no public keys were available to verify it." );
+        System.out.println( "File " + name + " was signed." );
         inputwrapper.onepasssiglist = (PGPOnePassSignatureList)o;
-        if ( inputwrapper.onepasssiglist.size() != 1 )
-          throw new IOException( "Invalid Signature Format in data file." );
         inputwrapper.onepasssignature = inputwrapper.onepasssiglist.get(0);
         long signerkeyid = inputwrapper.onepasssignature.getKeyID();
-        PGPPublicKey signerpubkey = keyfinder.findPublicKey(signerkeyid);
-        if ( signerpubkey == null )
-          throw new IOException( "Unable to find public key used to sign this data file." );
+        
+        if ( signerpublickey == null || signerkeyid != signerpublickey.getKeyID() )
+          throw new IOException("Unable to determine the ID of the key that signed this data.");
         
         TrustContextReport report = eu.getTrustContext().checkTrusted( signerkeyid );
         if( !report.isTrusted() )
           throw new TrustContextException( report );
         BcPGPContentVerifierBuilderProvider converbuildprov = new BcPGPContentVerifierBuilderProvider();
-        inputwrapper.onepasssignature.init( converbuildprov, signerpubkey );
+        inputwrapper.onepasssignature.init( converbuildprov, signerpublickey );
         o = pgpFact.nextObject();
         //System.out.println( "Object class " + o.getClass().toString() );
       }
@@ -595,7 +659,7 @@ public class EncryptedCompositeFile
       {
         if (!pbe.verify())
         {
-          System.err.println("message failed integrity check");
+          System.out.println("message failed integrity check");
         } else
         {
           //System.err.println("message integrity check passed");
@@ -606,7 +670,7 @@ public class EncryptedCompositeFile
       }
     } catch (PGPException e)
     {
-      System.err.println(e);
+      System.out.println(e);
       if (e.getUnderlyingException() != null)
       {
         e.getUnderlyingException().printStackTrace();
@@ -732,18 +796,18 @@ public class EncryptedCompositeFile
         {
           if (!pbe.verify())
           {
-            System.err.println("message failed integrity check");
+            System.out.println("message failed integrity check");
           } else
           {
-            System.err.println("message integrity check passed");
+            System.out.println("message integrity check passed");
           }
         } catch (PGPException ex)
         {
-          System.err.println("unable to run integrity check");
+          System.out.println("unable to run integrity check");
         }
       } else
       {
-        System.err.println("no message integrity check");
+        System.out.println("no message integrity check");
       }
       closeInputStream();
       literalin.close();

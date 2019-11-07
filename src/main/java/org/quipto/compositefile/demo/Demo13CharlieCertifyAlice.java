@@ -40,6 +40,6 @@ public class Demo13CharlieCertifyAlice
   {
     Security.addProvider(new BouncyCastleProvider());
     WindowsPasswordHandler passhandler = new WindowsPasswordHandler();
-    SignKeys.signKeysAndImport("charlie", passhandler, false, subjectaliases, addtoteam );
+    SignKeys.signKeysAndImport("charlie", passhandler, false, subjectaliases, addtoteam, null, null );
   }
 }

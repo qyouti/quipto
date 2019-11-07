@@ -11,6 +11,7 @@ import java.io.OutputStream;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
@@ -23,10 +24,12 @@ import org.bouncycastle.openpgp.PGPPublicKeyRingCollection;
 import org.bouncycastle.openpgp.PGPSecretKey;
 import org.bouncycastle.openpgp.PGPSecretKeyRing;
 import org.bouncycastle.openpgp.PGPSecretKeyRingCollection;
+import org.bouncycastle.openpgp.PGPSignature;
 import org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator;
 import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.key.KeyFinder;
 
 /**
  *
@@ -37,27 +40,24 @@ public class CompositeFileKeyStore
   private static final String INDEXFILENAME = "keysindexedbyuserid.xml";
   private static final KeyFingerPrintCalculator fingerprintcalc = new BcKeyFingerprintCalculator();
   
-  EncryptedCompositeFile compositefile;
-  EncryptedCompositeFileUser compositefileuser;
+  protected EncryptedCompositeFile compositefile;
+  protected EncryptedCompositeFileUser compositefileuser;
   Properties index;
 
-  public CompositeFileKeyStore( EncryptedCompositeFile compositefile, EncryptedCompositeFileUser compositefileuser ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public CompositeFileKeyStore( EncryptedCompositeFile compositefile )
   {
     this.compositefile = compositefile;
-    this.compositefileuser = compositefileuser;
-    if ( compositefileuser.getPasswordHandler() != null )
-      compositefile.addCustomUser(compositefileuser);
-    else if ( compositefileuser.getKeyFinder() != null )
-    {
-      PGPPublicKey publickey = compositefileuser.getKeyFinder().getSecretKeyForDecryption().getPublicKey();
-      compositefile.addPublicKey(compositefileuser, publickey);
-    }
-    
+  }
+  
+  public void setCompositeFileUser( EncryptedCompositeFileUser compositefileuser )
+          throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  {
+    this.compositefileuser = compositefileuser;    
     index = new Properties();
     if ( compositefile.exists(INDEXFILENAME) )
-      loadIndices();
-    
+      loadIndices();    
   }
+  
   
   public void close()
   {
@@ -102,6 +102,11 @@ public class CompositeFileKeyStore
   {
     compositefile.addPublicKey(compositefileuser, publickey);
   }
+
+  public void addAccessToCustomUser() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  {
+    compositefile.addCustomUser(compositefileuser);
+  }
   
   public static PGPPublicKey getMasterPublicKey( PGPPublicKeyRing keyring )
   {
@@ -142,14 +147,45 @@ public class CompositeFileKeyStore
     while ( keyiter.hasNext() )
     {
       PGPPublicKey key = keyiter.next();
+      String strkeyid = Long.toHexString(key.getKeyID());
       Iterator<String> useriditer = key.getUserIDs();
       while ( useriditer.hasNext() )
       {
         String userid = useriditer.next();
-        index.setProperty(userid, strmasterkeyid);
+        index.setProperty("userid_" + userid, strmasterkeyid);
+      }
+      Iterator<PGPSignature> sigiter = key.getSignatures();
+      while ( sigiter.hasNext() )
+      {
+        PGPSignature sig = sigiter.next();
+        String signerkeyid = Long.toHexString( sig.getKeyID() );
+        String currentvalue = index.getProperty("signer_" + signerkeyid);
+        if ( currentvalue == null )
+          currentvalue = "";
+        else
+          currentvalue = currentvalue + ",";
+        index.setProperty("signer_" + signerkeyid, currentvalue + strkeyid);
       }
     }    
     saveIndices();    
+  }
+  
+  /**
+   * Find the IDs of keys in this store that have signatures made with the specified signing key.
+   * @param signerkeyid
+   * @return 
+   */
+  public long[] getSignedKeyIds( long signerkeyid )
+  {
+    String strsignerkeyid = Long.toHexString( signerkeyid );
+    String currentvalue = index.getProperty("signer_" + strsignerkeyid);
+    if ( currentvalue == null || currentvalue == "" )
+      return new long[0];
+    String[] strkeyid = currentvalue.split(",");
+    long[] keyid = new long[strkeyid.length];
+    for ( int i=0; i<strkeyid.length; i++ )
+      keyid[i] = Long.parseUnsignedLong(strkeyid[i], 16);
+    return keyid;
   }
   
   public void setPublicKeyRing( PGPPublicKeyRing keyring ) throws IOException
@@ -161,7 +197,51 @@ public class CompositeFileKeyStore
     String strkeyid = Long.toHexString( masterkeyid );
     String filename = getPublicKeyFilename( masterkeyid );
     
+    // put all the new keys in a list
+    ArrayList<PGPPublicKey> mergedkeylist = new ArrayList<>();
+    ArrayList<PGPPublicKey> newkeylist = new ArrayList<>();
+    Iterator<PGPPublicKey> iter = keyring.getPublicKeys();
+    while ( iter.hasNext() )
+      newkeylist.add( iter.next() );
     
+    // what key ring is already in the store?
+    PGPPublicKeyRing existingkeyring = getPublicKeyRing( masterkeyid );
+    
+    for ( PGPPublicKey newkey : newkeylist )
+    {
+      PGPPublicKey existingkey=null;
+      if ( existingkeyring != null )
+        existingkey = existingkeyring.getPublicKey( newkey.getKeyID() );
+      PGPPublicKey mergedkey;
+      if ( existingkey == null )
+        mergedkey = newkey;
+      else
+      {
+        mergedkey = existingkey;
+        // add signatures from new key to the existing key
+        Iterator<PGPSignature> itersig = newkey.getSignatures();
+        while ( itersig.hasNext() )
+        {
+          PGPSignature newsig = itersig.next();
+          Iterator<PGPSignature> existingsigiter = existingkey.getSignatures();
+          boolean found = false;
+          while ( existingsigiter.hasNext() )
+          {
+            PGPSignature existingsig = existingsigiter.next();
+            if ( Arrays.equals( newsig.getEncoded(), existingsig.getEncoded() ) )
+            {
+              found = true;
+              break;
+            }
+          }
+          if ( !found )
+            mergedkey = PGPPublicKey.addCertification( mergedkey , newsig );
+        }
+      }
+      mergedkeylist.add(mergedkey);
+    }
+    
+    PGPPublicKeyRing mergedpublickeyring = new PGPPublicKeyRing( mergedkeylist );
     try ( OutputStream out = compositefile.getEncryptingOutputStream(compositefileuser, filename, true, false) )
     {
       keyring.encode(out);
@@ -193,6 +273,12 @@ public class CompositeFileKeyStore
     }
 
     indexSecretUserIDs( keyring, strkeyid );
+  }
+
+  public boolean doesPublicKeyRingExist( long masterid )
+  {
+    String filename = getPublicKeyFilename( masterid );
+    return compositefile.exists(filename);
   }
 
   
@@ -235,14 +321,14 @@ public class CompositeFileKeyStore
   
   public PGPPublicKeyRing getPublicKeyRing( String userid )
   {
-    String strkeyid = index.getProperty(userid);
+    String strkeyid = index.getProperty("userid_" + userid);
     if ( strkeyid == null ) return null;
     return getPublicKeyRing( Long.parseUnsignedLong(strkeyid, 16) );
   }  
   
   public PGPSecretKeyRing getSecretKeyRing( String userid )
   {
-    String strkeyid = index.getProperty(userid);
+    String strkeyid = index.getProperty("userid_" + userid);
     if ( strkeyid == null ) return null;
     return getSecretKeyRing( Long.parseUnsignedLong(strkeyid, 16) );
   }  

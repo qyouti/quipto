@@ -42,9 +42,15 @@ public class TeamTrust implements TrustContext, KeyFinder
   static final int TEAM     = 1;
   
   EncryptedCompositeFileUser[] eu = new EncryptedCompositeFileUser[2];
+  EncryptedCompositeFile[] compfile = new EncryptedCompositeFile[2];
   CompositeFileKeyStore[] keystore = new CompositeFileKeyStore[2];
+  TeamKeyStore teamkeystore;
   CompositeFileKeyFinder[] keyfinder = new CompositeFileKeyFinder[2];
 
+  PGPSecretKey ownsecretkeysigning, ownsecretkeydecryption;
+
+  ArrayList<Long> personallytrustedteamkeyids = new ArrayList<>();
+  
   public TeamTrust( String alias, EncryptedCompositeFilePasswordHandler passhandler, File personalkeystorefile, File teamkeystorefile ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, PGPException
   {
     try
@@ -52,18 +58,36 @@ public class TeamTrust implements TrustContext, KeyFinder
       File[] files = new File[2];
       files[0] = personalkeystorefile;
       files[1] = teamkeystorefile;
-      eu[PERSONAL] = new EncryptedCompositeFileUser( passhandler );  // personal store uses password
-      eu[TEAM]     = new EncryptedCompositeFileUser( keyfinder[0], new TrustAnythingContext() ); // shared store uses key from personal store
       for ( int i=0; i<2; i++ )
       {
-        EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile( files[i] );
+        compfile[i] = EncryptedCompositeFile.getCompositeFile( files[i] );
+        if ( i==PERSONAL )
+          keystore[i] = new CompositeFileKeyStore( compfile[i] );
+        else
+        {
+          keystore[i] = teamkeystore = new TeamKeyStore( compfile[i] );
+        }
+        keyfinder[i] = new CompositeFileKeyFinder( keystore[i], alias, alias );
         if ( i==PERSONAL )
           eu[PERSONAL] = new EncryptedCompositeFileUser( passhandler );  // personal store uses password
         if ( i==TEAM )
-          eu[TEAM]     = new EncryptedCompositeFileUser( keyfinder[PERSONAL], new TrustAnythingContext() ); // shared store uses key from personal store        
-        keystore[i] = new CompositeFileKeyStore( compfile, eu[i] );
-        keyfinder[i] = new CompositeFileKeyFinder( keystore[i], alias, alias );
+          eu[TEAM]     = new EncryptedCompositeFileUser( this, new TrustAnythingContext() ); // shared store uses key from personal store
+        keystore[i].setCompositeFileUser(eu[i] );
         keyfinder[i].init();
+        if ( i==PERSONAL )
+        {
+          ownsecretkeysigning = keyfinder[PERSONAL].getSecretKeyForSigning();
+          ownsecretkeydecryption = keyfinder[PERSONAL].getSecretKeyForDecryption();
+        }
+      }
+      
+      // List all keys personally trusted
+      long[] personallytrusted = keystore[PERSONAL].getSignedKeyIds( ownsecretkeysigning.getKeyID() );
+      // Narrow to those that are controllers in the team store.
+      for ( long keyid : personallytrusted )
+      {
+        if ( teamkeystore.isController(keyid) )
+          personallytrustedteamkeyids.add(keyid);
       }
     }
     catch (IOException ex)
@@ -79,13 +103,29 @@ public class TeamTrust implements TrustContext, KeyFinder
         keystore[i].close();
   }
   
-  public void addPublicKeyToTeamStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public void addPublicKeyToTeamStore( PGPPublicKey parentkey, PGPPublicKey publickey, boolean controller ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
     ArrayList<PGPPublicKey> list = new ArrayList<>();
     list.add(publickey);
-    keystore[TEAM].addAccessToPublicKey(publickey);
-    keystore[TEAM].setPublicKeyRing( new PGPPublicKeyRing(list) );
+    TeamKeyStore teamkeystore = (TeamKeyStore)keystore[TEAM];
+    teamkeystore.addAccessToPublicKey(publickey);
+    teamkeystore.setPublicKeyRing( new PGPPublicKeyRing(list) );
+    teamkeystore.addKey(parentkey, publickey, controller);
   }
+  
+  public void addParentCertificationToTeamStore( PGPPublicKey parentkey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  {
+    ArrayList<PGPPublicKey> list = new ArrayList<>();
+    list.add(parentkey);
+    TeamKeyStore teamkeystore = (TeamKeyStore)keystore[TEAM];
+    teamkeystore.setPublicKeyRing( new PGPPublicKeyRing(list) );
+  }
+  
+  public void dumpTeam()
+  {
+    TeamKeyStore teamkeystore = (TeamKeyStore)keystore[TEAM];
+    teamkeystore.dumpTeam();
+  }  
   
   public void addPublicKeyToPersonalStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
@@ -104,6 +144,14 @@ public class TeamTrust implements TrustContext, KeyFinder
     }
   }
   
+  private static String getUserID( PGPPublicKey key )
+  {
+    String userid = "unknown";
+    Iterator<String> iter = key.getUserIDs();
+    if ( iter.hasNext() ) userid = iter.next();
+    return userid;
+  }
+  
   @Override
   public TrustContextReport checkTrusted( long signerkeyid )
   {
@@ -118,23 +166,38 @@ public class TeamTrust implements TrustContext, KeyFinder
       return ex.getReport();
     }
     
-    System.out.println( "Trust chain...");
+    System.out.println( "Team trust chain...");
     for ( PGPPublicKey key : trustkeylist )
-    {
-      System.out.println( "ID: " + Long.toHexString( key.getKeyID() ) + " First UserID " + key.getUserIDs().next() );    
-    }
-    System.out.println( "...End of Trust chain");
+      System.out.println( "ID: " + Long.toHexString( key.getKeyID() ) + " First UserID " + getUserID( key ) );
+    System.out.println( "...End of Team Trust chain");
     
-    return checkTrustChainPublicKeys( trustkeylist );
+    int personallysignedpublickey=-1;
+    for ( int i=0; i<trustkeylist.length; i++ )
+    {
+      PGPPublicKey personalpublickey = keyfinder[PERSONAL].findPublicKey( trustkeylist[i].getKeyID() );
+      if ( personalpublickey != null )
+      {
+        personallysignedpublickey = i;
+        break;
+      }
+    }
+    if ( personallysignedpublickey >= 0 )
+      System.out.println( "Found in personal key store: " + Long.toHexString( trustkeylist[personallysignedpublickey].getKeyID() ) );
+    return checkTrustChainPublicKeys( trustkeylist, personallysignedpublickey );
   }
   
-  public PGPPublicKey[] loadTrustChainPublicKeys( long signerkeyid )
+  private PGPPublicKey[] loadTrustChainPublicKeys( long signerkeyid )
           throws TrustContextException
   {
-    // Just load them by keyid without verification or other checks
+    TeamKeyStore teamkeystore = (TeamKeyStore)keystore[TEAM];
+    PGPPublicKey[] keys = teamkeystore.getTeamKeyChain(signerkeyid, personallytrustedteamkeyids );
+    if ( keys == null )
+      throw new TrustContextException( new TrustContextReport( false, "The key that signed the data file is not listed in the Trust file." ) );
+    return keys;
+    /*
     PGPPublicKey publickey;
     Iterator<PGPSignature> sigiter;
-    PGPSignature sig;
+    PGPSignature sig, selfsig, othersig;
     ArrayList<PGPPublicKey> list = new ArrayList<>();
     boolean selfsign=false;
     
@@ -144,30 +207,71 @@ public class TeamTrust implements TrustContext, KeyFinder
       publickey = keyfinder[TEAM].findPublicKey( keyid );
       if ( publickey == null )
         throw new TrustContextException( new TrustContextReport( false, "Signing key that is not listed in the Trust file." ) );
+      
       sigiter = publickey.getSignatures();
-      if ( !sigiter.hasNext() )
+      selfsig = null;
+      othersig = null;
+      while ( sigiter.hasNext() )
+      {
+        sig = sigiter.next();
+        if ( sig.getKeyID() == keyid )
+          selfsig = sig;
+        else
+        {
+          if ( othersig != null )
+            throw new TrustContextException( new TrustContextReport( false, "A team key was found with more than one certification. This software cannot handle that." ) );
+          othersig = sig;
+        }
+      }
+      
+      if ( selfsig == null && othersig == null )
         throw new TrustContextException( new TrustContextReport( false, "Signing key is not itself signed and cannot be trusted." ) );
-      sig = sigiter.next();
-      if ( sigiter.hasNext() )
-        throw new TrustContextException( new TrustContextReport( false, "Signing key itself has more than one signature. This software cannot handle that." ) );
+      
       list.add(publickey);
-      if ( sig.getKeyID() == keyid )
+      if ( othersig == null )
+      {
         selfsign = true;
-      keyid = sig.getKeyID();
+        keyid = selfsig.getKeyID();
+      }
+      else
+        keyid = othersig.getKeyID();
     }
     while ( selfsign == false );
     
     return list.toArray( new PGPPublicKey[list.size()] );
+    */
   }
   
-  public TrustContextReport checkTrustChainPublicKeys( PGPPublicKey[] trustkeylist )
+  /**
+   * 
+   * @param trustkeylist list of keys from the one that signed the data to the team trust root
+   * @param personallysignedpublickey which in the list has been personally signed. Is negative if none were signed
+   * @return 
+   */
+  private TrustContextReport checkTrustChainPublicKeys( PGPPublicKey[] trustkeylist, int personallysignedpublickey )
   {
-    // Check that each signature is kosher
-    // Check that current user has a signed copy of one of the keys in the chain
+    if ( personallysignedpublickey < 0 )
+      return new TrustContextReport( false, "Neither the key used to sign the data file, nor the keys used to certify that key can be found in your personal trusted key store." );
+    
+    TrustContextReport report;
+    report = checkKeySignature( trustkeylist[personallysignedpublickey], ownsecretkeysigning.getPublicKey() );
+    if ( !report.isTrusted() ) return report;
+    for ( int i=personallysignedpublickey; i>0; i-- )
+    {
+      report = checkKeySignature( trustkeylist[i-1], trustkeylist[i] );
+      if ( !report.isTrusted() ) return report;      
+    }
     
     return new TrustContextReport( true, null );
   }
   
+  private TrustContextReport checkKeySignature( PGPPublicKey signed, PGPPublicKey signer )
+  {
+    System.out.print( " Checking ID: " + Long.toHexString( signed.getKeyID() ) + ", " + getUserID( signed ) );
+    System.out.println( " signed by " + Long.toHexString( signer.getKeyID() ) + ", " + getUserID( signer ) );
+    
+    return new TrustContextReport( true, null );
+  }
   
   @Override
   public String getPreferredAlias(PGPSecretKey secretkey)
@@ -184,13 +288,13 @@ public class TeamTrust implements TrustContext, KeyFinder
   @Override
   public PGPSecretKey getSecretKeyForDecryption()
   {
-    return keyfinder[PERSONAL].getSecretKeyForDecryption();
+    return ownsecretkeydecryption;
   }
 
   @Override
   public PGPSecretKey getSecretKeyForSigning()
   {
-    return keyfinder[PERSONAL].getSecretKeyForSigning();
+    return ownsecretkeysigning;
   }
 
   @Override

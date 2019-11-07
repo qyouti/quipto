@@ -39,6 +39,6 @@ public class Demo32DebbieCertifyBob
   {
     Security.addProvider(new BouncyCastleProvider());
     PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "debbie@thingy.com", "debbie".toCharArray() );
-    SignKeys.signKeysAndImport("debbie", passhandler, false, subjectaliases, addtoteam );
+    SignKeys.signKeysAndImport("debbie", passhandler, false, subjectaliases, addtoteam, null, null );
   }
 }

@@ -15,46 +15,19 @@
  */
 package org.quipto.compositefile.demo;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.security.InvalidKeyException;
-import java.security.KeyStore;
 import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.PrivateKey;
 import java.security.Security;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openpgp.PGPException;
-import org.quipto.compositefile.EncryptedCompositeFile;
-import org.quipto.compositefile.EncryptedCompositeFileUser;
-import org.quipto.key.impl.CompositeFileKeyFinder;
-import org.quipto.key.impl.CompositeFileKeyStore;
-import org.quipto.key.impl.OldPGPFileKeyFinder;
-import org.quipto.passwords.PasswordPasswordHandler;
 import org.quipto.passwords.WindowsPasswordHandler;
-import org.quipto.trust.TrustContext;
-import org.quipto.trust.impl.TrustAnythingContext;
 
 /**
- * User Charlie reads an entry in the demo encrypted composite file.
+ * User Charlie reads an entry in the demo encrypted composite file that Alice made.
  * 
  * @author maber01
  */
 public class Demo24CharlieReadEncryptedTar
 {
-  static String[] filenames = {"little.txt.gpg"};
+  static String[] filenames = {"little.txt"};
   /**
    * @param args the command line arguments
    */

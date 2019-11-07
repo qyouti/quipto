@@ -26,7 +26,9 @@ import org.quipto.passwords.PasswordPasswordHandler;
 public class Demo12BobCertifyAlice
 {
   static final String[] subjectaliases = { "alice" };
-  static final boolean[] addtoteam = { false };
+  static final boolean[] addtoteam = { true };
+  static final boolean[] controller = { true };
+  static final boolean[] parent = { true };
   
   /**
    * Run the demo.
@@ -39,6 +41,6 @@ public class Demo12BobCertifyAlice
   {
     Security.addProvider(new BouncyCastleProvider());
     PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "bob@thingy.com", "bob".toCharArray() );
-    SignKeys.signKeysAndImport("bob", passhandler, false, subjectaliases, addtoteam );
+    SignKeys.signKeysAndImport("bob", passhandler, false, subjectaliases, addtoteam, controller, parent );
   }
 }

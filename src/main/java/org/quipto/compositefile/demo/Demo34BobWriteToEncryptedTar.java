@@ -38,40 +38,15 @@ import org.quipto.trust.impl.TrustAnythingContext;
  */
 public class Demo34BobWriteToEncryptedTar
 {
-
+  static String[] filenames = {"bobscontribution.txt"};
+  static boolean[] big = {false};
   /**
    * @param args the command line arguments
    */
   public static void main(String[] args)
   {
-
     Security.addProvider(new BouncyCastleProvider());
-
-    try
-    {
-      File file = new File("demo/shared/mydataenc.tar");
-
-      String alias = "bob";
-      EncryptedCompositeFileUser keystoreeu = new EncryptedCompositeFileUser( new PasswordPasswordHandler( "bob@thingy.com", "bob".toCharArray() ) );
-      CompositeFileKeyStore keyringstore = new CompositeFileKeyStore( EncryptedCompositeFile.getCompositeFile( new File("demo/bobhome/keyring.tar") ), keystoreeu );
-      CompositeFileKeyFinder keyfinder = new CompositeFileKeyFinder( keyringstore, alias, alias );
-      keyfinder.init();
-      
-      EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( keyfinder, new TrustAnythingContext() );
-      EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
-      
-      OutputStream out;
-      
-      byte[] buffer = "Mary had a little lamb, its fleece was white as snow and everywhere that Mary went the lamb was sure to go. \n".getBytes();      
-      out = compfile.getEncryptingOutputStream( eu, "bobs contribution.txt.gpg", false, true );
-      out.write(buffer);
-      out.close();
-      compfile.close();
-
-    } catch (Exception ex)
-    {
-      ex.printStackTrace();
-    }
+    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "bob@thingy.com", "bob".toCharArray() );
+    WriteEncryptedTar.writeEncryptedTar("bob", passhandler, filenames, big);
   }
-
 }

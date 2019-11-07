@@ -24,7 +24,8 @@ public class Demo00RemoveDemoFiles
       else
       {
         if ( !item.getName().startsWith( "readme" ) )
-          item.delete();
+          if ( !item.delete() )
+            System.out.println( "Unable to delete " + item.getAbsolutePath() );
       }
     }
   }

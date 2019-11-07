@@ -27,6 +27,8 @@ public class Demo31BobCertifyDebbie
 {
   static final String[] subjectaliases = { "debbie" };
   static final boolean[] addtoteam = { true };
+  static final boolean[] controller = { false };
+  static final boolean[] isparent = { false };
   
   /**
    * Run the demo.
@@ -39,6 +41,6 @@ public class Demo31BobCertifyDebbie
   {
     Security.addProvider(new BouncyCastleProvider());
     PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "bob@thingy.com", "bob".toCharArray() );
-    SignKeys.signKeysAndImport("bob", passhandler, false, subjectaliases, addtoteam );
+    SignKeys.signKeysAndImport("bob", passhandler, false, subjectaliases, addtoteam, controller, isparent );
   }
 }

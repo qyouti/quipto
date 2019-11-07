@@ -33,7 +33,7 @@ public class SignKeys
 {
   private static final KeyFingerPrintCalculator fingerprintcalc = new BcKeyFingerprintCalculator();
   
-  public static void signKeysAndImport( String signeralias, EncryptedCompositeFilePasswordHandler passhandler, boolean addselftoteam, String[] subjectaliases, boolean[] addtoteam )
+  public static void signKeysAndImport( String signeralias, EncryptedCompositeFilePasswordHandler passhandler, boolean addselftoteam, String[] subjectaliases, boolean[] addtoteam, boolean[] controller, boolean[] isparent )
   {
     Security.addProvider(new BouncyCastleProvider());
     
@@ -46,8 +46,9 @@ public class SignKeys
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
       StandardRSAKeyBuilderSigner signer = new StandardRSAKeyBuilderSigner();
       
+      PGPPublicKey mypublickey = teamtrust.getSecretKeyForSigning().getPublicKey();
       if ( addselftoteam )
-        teamtrust.addPublicKeyToTeamStore( teamtrust.getSecretKeyForSigning().getPublicKey() );
+        teamtrust.addPublicKeyToTeamStore( null, mypublickey, true );
       
       for ( int i=0; i<subjectaliases.length; i++ )
       {
@@ -57,10 +58,20 @@ public class SignKeys
         PGPPublicKeyRing keyring = new PGPPublicKeyRing( fin, fingerprintcalc );
         fin.close();
         PGPPublicKey pubkey = keyring.getPublicKey();
-        pubkey = signer.signKey(teamtrust.getPrivateKey(teamtrust.getSecretKeyForSigning()), pubkey, KeyFlags.CERTIFY_OTHER | KeyFlags.ENCRYPT_STORAGE | KeyFlags.SIGN_DATA);
+        pubkey = signer.signKey(
+                teamtrust.getPrivateKey(teamtrust.getSecretKeyForSigning()), 
+                pubkey, 
+                KeyFlags.CERTIFY_OTHER | KeyFlags.ENCRYPT_STORAGE | KeyFlags.SIGN_DATA,
+                StandardRSAKeyBuilderSigner.INCLUDE_SELF_SIGNATURE );
         teamtrust.addPublicKeyToPersonalStore(pubkey);
+        
         if ( addtoteam != null && i<addtoteam.length && addtoteam[i] )
-          teamtrust.addPublicKeyToTeamStore(pubkey);
+        {
+          if ( isparent[i] )
+            teamtrust.addParentCertificationToTeamStore( pubkey );
+          else
+            teamtrust.addPublicKeyToTeamStore(mypublickey,pubkey,controller[i]);
+        }
       }
       
       teamtrust.close();
