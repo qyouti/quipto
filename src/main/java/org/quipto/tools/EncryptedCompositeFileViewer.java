@@ -37,8 +37,10 @@ import org.quipto.trust.team.TeamTrust;
 public class EncryptedCompositeFileViewer
         extends javax.swing.JFrame
 {
-  CompositeFileKeyStore personalkeystore;
-  TeamTrust teamkeystore;
+  EncryptedCompositeFilePasswordHandler personalkeystorepasshandler;
+  File personalkeystorefile;
+
+  TeamTrust teamtrust;
   
   String alias;
   EncryptedCompositeFileUser euser;
@@ -89,6 +91,8 @@ public class EncryptedCompositeFileViewer
     openteammenutiem = new javax.swing.JMenuItem();
     openmenuitem = new javax.swing.JMenuItem();
     extractentrymenuitem = new javax.swing.JMenuItem();
+    jSeparator1 = new javax.swing.JPopupMenu.Separator();
+    exitmenuitem = new javax.swing.JMenuItem();
 
     setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -194,6 +198,17 @@ public class EncryptedCompositeFileViewer
       }
     });
     jMenu1.add(extractentrymenuitem);
+    jMenu1.add(jSeparator1);
+
+    exitmenuitem.setText("Exit");
+    exitmenuitem.addActionListener(new java.awt.event.ActionListener()
+    {
+      public void actionPerformed(java.awt.event.ActionEvent evt)
+      {
+        exitmenuitemActionPerformed(evt);
+      }
+    });
+    jMenu1.add(exitmenuitem);
 
     jMenuBar1.add(jMenu1);
 
@@ -204,7 +219,6 @@ public class EncryptedCompositeFileViewer
 
   private void openkeyringmenuitemActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_openkeyringmenuitemActionPerformed
   {//GEN-HEADEREND:event_openkeyringmenuitemActionPerformed
-    // TODO add your handling code here:
     JFileChooser fc = new JFileChooser();
     fc.setCurrentDirectory( new File(".") );
     int result = fc.showOpenDialog( rootPane );
@@ -240,7 +254,7 @@ public class EncryptedCompositeFileViewer
     String pass = null;
     if ( choice == JOptionPane.NO_OPTION )
     {
-      pass = JOptionPane.showInputDialog("Enter the password for unlocking the selected key store.");
+      pass = JOptionPane.showInputDialog(rootPane,"Enter the password for unlocking the selected key store.");
       if ( pass != null && pass.trim().length() == 0 )
       {
         keystorelabel.setText( "" );
@@ -251,28 +265,17 @@ public class EncryptedCompositeFileViewer
     
     try
     {
-      EncryptedCompositeFile compfile;
-      EncryptedCompositeFileUser euforkeystore;
-      EncryptedCompositeFilePasswordHandler passhandler;
-      CompositeFileKeyFinder keyfinder;
-      
       if ( pass != null )
-        passhandler = new PasswordPasswordHandler( alias, pass.toCharArray() );
+        personalkeystorepasshandler = new PasswordPasswordHandler( alias, pass.toCharArray() );
       else
-        passhandler = new WindowsPasswordHandler();
-      compfile = EncryptedCompositeFile.getCompositeFile( file );
-      euforkeystore = new EncryptedCompositeFileUser( passhandler );  // personal store uses password
-      personalkeystore = new CompositeFileKeyStore( compfile );
-      keyfinder = new CompositeFileKeyFinder( personalkeystore, alias, alias );
-      personalkeystore.setCompositeFileUser(euforkeystore);
-      keyfinder.init();
-      
-      euser = new EncryptedCompositeFileUser( keyfinder, new TrustAnythingContext() );
+        personalkeystorepasshandler = new WindowsPasswordHandler();
+      personalkeystorefile = file;
     }
     catch ( Exception e )
     {
       alias = null;
       euser = null;
+      personalkeystorefile = null;
       keystorelabel.setText( "" );
       aliaslabel.setText( "" );
       e.printStackTrace();
@@ -284,9 +287,9 @@ public class EncryptedCompositeFileViewer
   private void openmenuitemActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_openmenuitemActionPerformed
   {//GEN-HEADEREND:event_openmenuitemActionPerformed
 
-    if ( euser == null )
+    if ( euser == null || teamtrust == null )
     {
-      JOptionPane.showMessageDialog( rootPane, "You need to open a keystore before opening a data file." );
+      JOptionPane.showMessageDialog( rootPane, "You need to open a personal keystore and a team keystore before opening a data file." );
       return;
     }
 
@@ -307,9 +310,9 @@ public class EncryptedCompositeFileViewer
     {
       if ( compfile != null )
         compfile.close();
-      
       datastorelabel.setText(file.getAbsolutePath());
       compfile = EncryptedCompositeFile.getCompositeFile( file );
+
       listmodel.clear();
       for ( String name : compfile.getComponentNames() )
       {
@@ -413,9 +416,44 @@ public class EncryptedCompositeFileViewer
   {//GEN-HEADEREND:event_openteammenutiemActionPerformed
     
     
+    JFileChooser fc = new JFileChooser();
+    fc.setCurrentDirectory( new File(".") );
+    int result = fc.showOpenDialog( rootPane );
+    if ( result != JFileChooser.APPROVE_OPTION )
+      return;
+    
+    File teamkeystorefile = fc.getSelectedFile();
+    if ( !teamkeystorefile.isFile() )
+    {
+      JOptionPane.showMessageDialog( rootPane, "You need to select a file, not a folder." );
+      return;
+    }
+    
+    teamlabel.setText( teamkeystorefile.getAbsolutePath() );
+    
+    try
+    {
+      teamtrust = new TeamTrust( alias, personalkeystorepasshandler, personalkeystorefile, teamkeystorefile );
+      euser = new EncryptedCompositeFileUser( teamtrust, teamtrust );
+    }
+    catch ( Exception e )
+    {
+      teamtrust = null;
+      euser = null;
+      teamlabel.setText( "" );
+      e.printStackTrace();
+      JOptionPane.showMessageDialog( rootPane, "A problem occured attempting to open that keyring file." );
+    }
+    
     
     
   }//GEN-LAST:event_openteammenutiemActionPerformed
+
+  private void exitmenuitemActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_exitmenuitemActionPerformed
+  {//GEN-HEADEREND:event_exitmenuitemActionPerformed
+    setVisible( false );
+    dispose();
+  }//GEN-LAST:event_exitmenuitemActionPerformed
 
   /**
    * @param args the command line arguments
@@ -473,6 +511,7 @@ public class EncryptedCompositeFileViewer
   private javax.swing.JTextArea contenttextarea;
   private javax.swing.JLabel datastorelabel;
   private javax.swing.JList<String> entrylist;
+  private javax.swing.JMenuItem exitmenuitem;
   private javax.swing.JMenuItem extractentrymenuitem;
   private javax.swing.JLabel jLabel1;
   private javax.swing.JLabel jLabel2;
@@ -485,6 +524,7 @@ public class EncryptedCompositeFileViewer
   private javax.swing.JPanel jPanel3;
   private javax.swing.JScrollPane jScrollPane1;
   private javax.swing.JScrollPane jScrollPane2;
+  private javax.swing.JPopupMenu.Separator jSeparator1;
   private javax.swing.JSplitPane jSplitPane1;
   private javax.swing.JLabel keystorelabel;
   private javax.swing.JMenuItem openkeyringmenuitem;
