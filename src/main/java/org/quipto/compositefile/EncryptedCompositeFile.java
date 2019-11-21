@@ -81,56 +81,32 @@ public class EncryptedCompositeFile
   static final public int PASS_KNOWN = 2;
 
 
-  static final HashMap<String, EncryptedCompositeFile> ecache = new HashMap<>();
-
+  EncryptedCompositeFileUser eu;
+          
   /**
-   * Create or retrieve an EncryptedCompositeFile. Must provide the private PGP key and its alias
-   * that will be used to decrypt passwords.
+   * Constructor.
    * 
-   * @param file The tar file requested.
-   * @return The EncryptedCompositeFile ready to use.
-   * @throws IOException
-   * @throws NoSuchProviderException 
-   */
-  public static EncryptedCompositeFile getCompositeFile(File file)
-          throws IOException
-  {
-    String canonical = file.getCanonicalPath();
-    EncryptedCompositeFile cf;
-    synchronized (ecache)
-    {
-      cf = ecache.get(canonical);
-      if (cf == null)
-      {
-        cf = new EncryptedCompositeFile(canonical, file);
-        ecache.put(canonical, cf);
-      }
-    }
-    return cf;
-  }
-  
-  //OutputStream encryptedoutput = null;
-
-  /**
-   * Constructor is not public - the static get method must be used.
-   * 
-   * @param canonical
    * @param file
-   * @param provider
-   * @param key
-   * @param id
-   * @param keyalias
-   * @throws IOException
-   * @throws NoSuchProviderException 
+   * @param eu
+   * @throws IOException 
    */
-  EncryptedCompositeFile( String canonical, File file )
-          throws IOException
+  public EncryptedCompositeFile( File file, boolean create, EncryptedCompositeFileUser eu )
+          throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    super(canonical, file);
+    super(file, create);
+    this.eu = eu;
+    if ( isNewlyCreated() )
+    {
+      // add user's own password with appropriate encryption
+      if ( eu.isExclusive() )
+        addCustomUser();
+      else
+        addPublicKey(eu.getKeyFinder().getSecretKeyForDecryption().getPublicKey());
+    }
   }
   
 
-  private static String getPassphraseFileName( KeyFinder keyfinder, PGPPublicKey publickey )
+  private static String getPassphraseFileName( PGPPublicKey publickey )
   {
     long keyid = publickey.getKeyID();
     String strkeyid = Long.toHexString(keyid);
@@ -168,7 +144,7 @@ public class EncryptedCompositeFile
    * @throws IOException
    * @throws NoSuchProviderException 
    */
-  private void initPassphraseForThisCompositeFile( EncryptedCompositeFileUser eu )
+  private void initPassphraseForThisCompositeFile()
           throws IOException, NoSuchProviderException
   {
     int passphrasestatus = eu.getPassPhraseStatus( getCanonicalPath() );
@@ -194,7 +170,7 @@ public class EncryptedCompositeFile
             passphrasestatus = PASS_HIDDEN;
           }
 
-          if (name.equals( getPassphraseFileName(eu.getKeyFinder(), mypublickey) ) )
+          if (name.equals( getPassphraseFileName(mypublickey) ) )
           {
             InputStream in = super.getInputStream(name);
             passphrase = decryptPassphraseUsingOpenPGP(eu,in);
@@ -259,7 +235,7 @@ public class EncryptedCompositeFile
    * @return The stream to write 'plain text' to.
    * @throws IOException 
    */
-  public synchronized OutputStream getEncryptingOutputStream(EncryptedCompositeFileUser eu, String name, boolean replace, boolean sign )
+  public synchronized OutputStream getEncryptingOutputStream(String name, boolean replace, boolean sign )
           throws IOException
   {
     KeyFinder keyfinder = eu.getKeyFinder();
@@ -267,7 +243,7 @@ public class EncryptedCompositeFile
       throw new IOException("Can't sign an entry in a composite file if the user doesn't specify OpenPGP keys.");
     try
     {
-      initPassphraseForThisCompositeFile(eu);
+      initPassphraseForThisCompositeFile();
     }
     catch (NoSuchProviderException ex)
     {
@@ -354,7 +330,7 @@ public class EncryptedCompositeFile
    * @param passphrase
    * @return 
    */
-  private synchronized PGPPublicKey getSignerPublicKey( EncryptedCompositeFileUser eu, String name, char[] passphrase ) throws IOException
+  private synchronized PGPPublicKey getSignerPublicKey( String name, char[] passphrase ) throws IOException
   {
     long signerkeyid;
     
@@ -418,12 +394,12 @@ public class EncryptedCompositeFile
    * @return
    * @throws IOException 
    */
-  public  synchronized InputStream getDecryptingInputStream(EncryptedCompositeFileUser eu, String name ) throws IOException
+  public  synchronized InputStream getDecryptingInputStream( String name ) throws IOException
   {
     System.out.println( "Reading " + name );
     try
     {
-      initPassphraseForThisCompositeFile(eu);
+      initPassphraseForThisCompositeFile();
     }
     catch (NoSuchProviderException ex)
     {
@@ -435,7 +411,7 @@ public class EncryptedCompositeFile
     if ( passphrase == null )
       throw new IOException("Unable to initialise decryption input because no pass phrase has been generated.");
     
-    PGPPublicKey signerpublickey = getSignerPublicKey( eu, name, passphrase );
+    PGPPublicKey signerpublickey = getSignerPublicKey( name, passphrase );
     
     EncryptedInputWrapper inputwrapper = new EncryptedInputWrapper();
     try ( InputStream  tarin = super.getInputStream(name) )
@@ -519,10 +495,6 @@ public class EncryptedCompositeFile
           throws IOException
   {
     super.close();
-    synchronized ( ecache )
-    {
-      ecache.remove( getCanonicalPath() );
-    }
   }
 
   /**
@@ -690,9 +662,9 @@ public class EncryptedCompositeFile
    * @throws NoSuchProviderException
    * @throws NoSuchAlgorithmException 
    */
-  public void addPublicKey(EncryptedCompositeFileUser eu, PGPPublicKey key) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public void addPublicKey(PGPPublicKey key) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    initPassphraseForThisCompositeFile( eu );
+    initPassphraseForThisCompositeFile();
     int passphrasestatus = eu.getPassPhraseStatus( getCanonicalPath() );
     if (passphrasestatus == PASS_HIDDEN)
     {
@@ -705,23 +677,23 @@ public class EncryptedCompositeFile
       eu.setPassPhraseStatus(getCanonicalPath(), PASS_KNOWN );
     }
 
-    OutputStream out = super.getOutputStream(getPassphraseFileName(eu.getKeyFinder(),key), true);
+    OutputStream out = super.getOutputStream(getPassphraseFileName(key), true);
     byte[] encrypted = encryptPassphraseUsingOpenPGP( eu.getPassPhrase( getCanonicalPath() ), key, true);
     out.write(encrypted);
     out.close();
   }
 
   /**
-   * Add a public key to the composite file which will be used to encrypt the passphrase.If this is the first public key then generate a random passphrase first.
+   * Add single 'custom' encrypted password.
    * @param eu
    * @param key
    * @throws IOException
    * @throws NoSuchProviderException
    * @throws NoSuchAlgorithmException 
    */
-  public void addCustomUser(EncryptedCompositeFileUser eu) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  private void addCustomUser() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    initPassphraseForThisCompositeFile( eu );
+    initPassphraseForThisCompositeFile();
     int passphrasestatus = eu.getPassPhraseStatus( getCanonicalPath() );
     if (passphrasestatus == PASS_HIDDEN)
     {

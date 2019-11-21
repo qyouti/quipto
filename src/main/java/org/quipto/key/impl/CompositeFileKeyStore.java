@@ -41,23 +41,15 @@ public class CompositeFileKeyStore
   private static final KeyFingerPrintCalculator fingerprintcalc = new BcKeyFingerprintCalculator();
   
   protected EncryptedCompositeFile compositefile;
-  protected EncryptedCompositeFileUser compositefileuser;
   Properties index;
 
   public CompositeFileKeyStore( EncryptedCompositeFile compositefile )
   {
     this.compositefile = compositefile;
-  }
-  
-  public void setCompositeFileUser( EncryptedCompositeFileUser compositefileuser )
-          throws IOException, NoSuchProviderException, NoSuchAlgorithmException
-  {
-    this.compositefileuser = compositefileuser;    
     index = new Properties();
     if ( compositefile.exists(INDEXFILENAME) )
       loadIndices();    
   }
-  
   
   public void close()
   {
@@ -74,7 +66,7 @@ public class CompositeFileKeyStore
   
   private void saveIndices()
   {
-    try ( OutputStream out = compositefile.getEncryptingOutputStream(compositefileuser, INDEXFILENAME, true, false) )
+    try ( OutputStream out = compositefile.getEncryptingOutputStream(INDEXFILENAME, true, false) )
     {
       index.storeToXML( out, "Index of keys" );
     }
@@ -86,7 +78,7 @@ public class CompositeFileKeyStore
   
   private void loadIndices()
   {
-    try ( InputStream in = compositefile.getDecryptingInputStream(compositefileuser, INDEXFILENAME) )
+    try ( InputStream in = compositefile.getDecryptingInputStream(INDEXFILENAME) )
     {
       //System.out.println( "loading indices");
       index.loadFromXML(in);
@@ -100,14 +92,9 @@ public class CompositeFileKeyStore
 
   public void addAccessToPublicKey( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    compositefile.addPublicKey(compositefileuser, publickey);
+    compositefile.addPublicKey(publickey);
   }
 
-  public void addAccessToCustomUser() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
-  {
-    compositefile.addCustomUser(compositefileuser);
-  }
-  
   public static PGPPublicKey getMasterPublicKey( PGPPublicKeyRing keyring )
   {
     Iterator<PGPPublicKey> iter = keyring.getPublicKeys();
@@ -242,7 +229,7 @@ public class CompositeFileKeyStore
     }
     
     PGPPublicKeyRing mergedpublickeyring = new PGPPublicKeyRing( mergedkeylist );
-    try ( OutputStream out = compositefile.getEncryptingOutputStream(compositefileuser, filename, true, false) )
+    try ( OutputStream out = compositefile.getEncryptingOutputStream(filename, true, false) )
     {
       keyring.encode(out);
     }
@@ -263,7 +250,7 @@ public class CompositeFileKeyStore
     String strkeyid = Long.toHexString( masterkeyid );
     String filename = getSecretKeyFilename( masterkeyid );    
     
-    try ( OutputStream out = compositefile.getEncryptingOutputStream(compositefileuser, filename, true, false) )
+    try ( OutputStream out = compositefile.getEncryptingOutputStream(filename, true, false) )
     {
       keyring.encode(out);
     }
@@ -289,7 +276,7 @@ public class CompositeFileKeyStore
       return null;
 
     //System.out.println( "Loading public key ring collection" );
-    try ( InputStream in = compositefile.getDecryptingInputStream(compositefileuser, filename) )
+    try ( InputStream in = compositefile.getDecryptingInputStream(filename) )
     {
       return new PGPPublicKeyRing( in, fingerprintcalc );
     }
@@ -307,7 +294,7 @@ public class CompositeFileKeyStore
     if ( !compositefile.exists(filename) )
       return null;
 
-    try ( InputStream in = compositefile.getDecryptingInputStream(compositefileuser, filename) )
+    try ( InputStream in = compositefile.getDecryptingInputStream(filename) )
     {
       return new PGPSecretKeyRing( in, fingerprintcalc );
     }

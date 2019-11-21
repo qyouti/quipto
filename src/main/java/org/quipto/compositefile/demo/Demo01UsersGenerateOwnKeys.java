@@ -76,9 +76,7 @@ public class Demo01UsersGenerateOwnKeys
       eu = new EncryptedCompositeFileUser( new PasswordPasswordHandler( alias + "@thingy.com", alias.toCharArray() ) );
     if ( eu != null )
     {
-      CompositeFileKeyStore keystore = new CompositeFileKeyStore( EncryptedCompositeFile.getCompositeFile( file ) );
-      keystore.setCompositeFileUser( eu );
-      keystore.addAccessToCustomUser();  // add access to self
+      CompositeFileKeyStore keystore = new CompositeFileKeyStore( new EncryptedCompositeFile( file, true, eu ) );
       return keystore;
     }
     return null;

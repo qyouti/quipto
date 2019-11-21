@@ -311,7 +311,7 @@ public class EncryptedCompositeFileViewer
       if ( compfile != null )
         compfile.close();
       datastorelabel.setText(file.getAbsolutePath());
-      compfile = EncryptedCompositeFile.getCompositeFile( file );
+      compfile = new EncryptedCompositeFile( file, false, euser );
 
       listmodel.clear();
       for ( String name : compfile.getComponentNames() )
@@ -345,7 +345,7 @@ public class EncryptedCompositeFileViewer
       return;
     
     StringBuilder builder = new StringBuilder();
-    try ( InputStreamReader reader = new InputStreamReader( compfile.getDecryptingInputStream(euser, value), "UTF-8" ) )
+    try ( InputStreamReader reader = new InputStreamReader( compfile.getDecryptingInputStream(value), "UTF-8" ) )
     {
       int c;
       while ( (c = reader.read()) >= 0 )
@@ -397,7 +397,7 @@ public class EncryptedCompositeFileViewer
     }
     
     try ( 
-            InputStream in = compfile.getDecryptingInputStream(euser, value);
+            InputStream in = compfile.getDecryptingInputStream(value);
             OutputStream out = new FileOutputStream( outfile );
         )
     {

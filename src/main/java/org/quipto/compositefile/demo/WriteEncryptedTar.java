@@ -58,13 +58,13 @@ public class WriteEncryptedTar
       
       TeamTrust teamtrust = new TeamTrust( alias, passhandler, personalkeystorefile, teamkeystorefile );
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
-      EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
+      EncryptedCompositeFile compfile = new EncryptedCompositeFile( file, !file.exists(), eu );
       
       teamtrust.addAllTeamKeysToEncryptedCompositeFile(compfile, eu);
       for ( int j=0; j<entrynames.length; j++ )
       {
         String entryname = entrynames[j];
-        OutputStream out = compfile.getEncryptingOutputStream(eu, entryname, true, true );
+        OutputStream out = compfile.getEncryptingOutputStream( entryname, true, true );
         if ( big[j] )
         {
           buffer = "The quick brown fox jumps over the lazy dog. \n".getBytes();

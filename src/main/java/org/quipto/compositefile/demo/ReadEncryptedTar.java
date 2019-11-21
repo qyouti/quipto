@@ -57,12 +57,12 @@ public class ReadEncryptedTar
       
       TeamTrust teamtrust = new TeamTrust( alias, passhandler, personalkeystorefile, teamkeystorefile );
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
-      EncryptedCompositeFile compfile = EncryptedCompositeFile.getCompositeFile(file);
-      compfile.addPublicKey(eu, teamtrust.getSecretKeyForDecryption().getPublicKey() );
+      EncryptedCompositeFile compfile = new EncryptedCompositeFile(file, false, eu);
+      compfile.addPublicKey( teamtrust.getSecretKeyForDecryption().getPublicKey() );
       
       for ( String entryname : entrynames )
       {
-        in=compfile.getDecryptingInputStream( eu, entryname );
+        in=compfile.getDecryptingInputStream( entryname );
         System.out.print( "0  :  " );
         for ( i=0; (x = in.read()) >= 0; i++ )
         {

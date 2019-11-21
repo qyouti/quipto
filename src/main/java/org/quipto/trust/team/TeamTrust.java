@@ -60,19 +60,16 @@ public class TeamTrust implements TrustContext, KeyFinder
       files[1] = teamkeystorefile;
       for ( int i=0; i<2; i++ )
       {
-        compfile[i] = EncryptedCompositeFile.getCompositeFile( files[i] );
-        if ( i==PERSONAL )
-          keystore[i] = new CompositeFileKeyStore( compfile[i] );
-        else
-        {
-          keystore[i] = teamkeystore = new TeamKeyStore( compfile[i] );
-        }
-        keyfinder[i] = new CompositeFileKeyFinder( keystore[i], alias, alias );
         if ( i==PERSONAL )
           eu[PERSONAL] = new EncryptedCompositeFileUser( passhandler );  // personal store uses password
         if ( i==TEAM )
           eu[TEAM]     = new EncryptedCompositeFileUser( this, new TrustAnythingContext() ); // shared store uses key from personal store
-        keystore[i].setCompositeFileUser(eu[i] );
+        compfile[i] = new EncryptedCompositeFile( files[i], true, eu[i] );
+        if ( i==PERSONAL )
+          keystore[i] = new CompositeFileKeyStore( compfile[i] );
+        else
+          keystore[i] = teamkeystore = new TeamKeyStore( compfile[i] );
+        keyfinder[i] = new CompositeFileKeyFinder( keystore[i], alias, alias );
         keyfinder[i].init();
         if ( i==PERSONAL )
         {
@@ -147,7 +144,7 @@ public class TeamTrust implements TrustContext, KeyFinder
     for ( PGPPublicKeyRing keyring : fulllist )
     {
       keyring.getPublicKey();  // the master key
-      compositefile.addPublicKey( eu, keyring.getPublicKey() );
+      compositefile.addPublicKey( keyring.getPublicKey() );
     }
   }
   

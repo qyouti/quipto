@@ -29,21 +29,29 @@ public class EncryptedCompositeFileUser
 {
   KeyFinder keyfinder;
   TrustContext trustcontext;
+  boolean exclusive=false;
   EncryptedCompositeFilePasswordHandler passhandler;
     
   HashMap<String,PassPhraseStatus> passphrasestatusmap = new HashMap<>();
 
   public EncryptedCompositeFileUser( KeyFinder keyfinder, TrustContext trustcontext )
   {
+    this.exclusive = false;
     this.keyfinder = keyfinder;
     this.trustcontext = trustcontext;
   }
   
   public EncryptedCompositeFileUser( EncryptedCompositeFilePasswordHandler passhandler )
   {
+    this.exclusive = true;
     this.passhandler = passhandler;
   }
 
+  public boolean isExclusive()
+  {
+    return exclusive;
+  }
+  
   public KeyFinder getKeyFinder()
   {
     return keyfinder;

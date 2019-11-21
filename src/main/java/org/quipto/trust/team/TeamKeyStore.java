@@ -170,7 +170,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
   {
     try
     {
-      InputStreamReader reader = new InputStreamReader(compositefile.getDecryptingInputStream(compositefileuser, TEAMCONFIGFILENAME));
+      InputStreamReader reader = new InputStreamReader(compositefile.getDecryptingInputStream(TEAMCONFIGFILENAME));
       int c;
       while ( (c = reader.read()) >= 0 )
         System.out.print( (char)c );
@@ -206,7 +206,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
       
       //dumpTeam();
       
-      InputStream in = compositefile.getDecryptingInputStream(compositefileuser, TEAMCONFIGFILENAME);
+      InputStream in = compositefile.getDecryptingInputStream(TEAMCONFIGFILENAME);
       SAXParserFactory spf = SAXParserFactory.newInstance();    
       spf.setNamespaceAware(true);
       SAXParser saxParser = spf.newSAXParser();
@@ -225,7 +225,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
   
   void saveTree() throws IOException
   {
-    try (OutputStreamWriter writer = new OutputStreamWriter( compositefile.getEncryptingOutputStream(compositefileuser, TEAMCONFIGFILENAME, true, true), "UTF-8" ))
+    try (OutputStreamWriter writer = new OutputStreamWriter( compositefile.getEncryptingOutputStream(TEAMCONFIGFILENAME, true, true), "UTF-8" ))
     {
       writer.write("<?xml version=\"1.0\"?>\n");
       writer.write("<team id=\"" + (teamid==null?"":teamid) + "\">\n");

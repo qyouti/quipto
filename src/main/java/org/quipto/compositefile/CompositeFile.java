@@ -38,40 +38,13 @@ import org.apache.commons.compress.archivers.tar.TarConstants;
  */
 public class CompositeFile
 {
-    static final HashMap<String,CompositeFile> cache = new HashMap<>();
     static byte[] zeroblock = new byte[512];
-    
-    /**
-     * Retrieves an active composite file from a cache or makes a
-     * new one.  The intention is to make it safe for two different
-     * threads to work with the same composite file - requests to
-     * read/write files will block until other thread has completed
-     * work.  Not tested as yet.
-     * @param file
-     * @return
-     * @throws IOException 
-     */
-    public static CompositeFile getCompositeFile( File file ) throws IOException
-    {
-        String canonical = file.getCanonicalPath();
-        CompositeFile cf;
-        synchronized ( cache )
-        {
-            cf = cache.get(canonical);
-            if ( cf == null )
-            {
-                cf = new CompositeFile( canonical, file );
-                cache.put( canonical, cf );
-            }
-        }
-        return cf;
-    }
     
     private final String canonical;
     private final File file;
     private final RandomAccessFile raf;
     private final FileLock lock;
-    private final boolean exists;
+    private boolean newlycreated;
     private InputStream currentinputstream = null;
     private OutputStream currentoutputstream = null;
     private SeekableTarArchiveOutputStream tos;
@@ -89,11 +62,14 @@ public class CompositeFile
      * @param file The tar file.
      * @throws IOException 
      */
-    CompositeFile( String canonical, File file ) throws IOException
+    public CompositeFile( File file, boolean create ) throws IOException
     {
-        this.canonical = canonical;
+        canonical = file.getCanonicalPath();
         this.file = file;
-        exists=file.exists();
+        newlycreated=false;
+        boolean exists = file.exists();
+        if ( !exists && !create )
+          throw new IOException( "File " + canonical + " does not exist." );
         raf = new RandomAccessFile( file, "rwd" );
         // now the file will exist - if 'exists == true' it will be empty
         lock = raf.getChannel().lock();
@@ -102,11 +78,17 @@ public class CompositeFile
             raf.write( zeroblock );
             raf.write( zeroblock );
             raf.seek(0);
+            newlycreated = true;
         }
         
         readComponentMap();
     }
 
+    public boolean isNewlyCreated()
+    {
+      return newlycreated;
+    }
+    
   public String getCanonicalPath()
   {
     return canonical;
@@ -126,10 +108,6 @@ public class CompositeFile
         {
             lock.release();
             raf.close();
-        }
-        synchronized ( cache )
-        {
-            cache.remove( canonical );
         }
     }
     
