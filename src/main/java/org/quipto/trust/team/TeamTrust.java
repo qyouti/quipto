@@ -103,11 +103,19 @@ public class TeamTrust implements TrustContext, KeyFinder
         keystore[i].close();
   }
   
+  public void addRootPublicKeyToTeamStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  {
+    ArrayList<PGPPublicKey> list = new ArrayList<>();
+    list.add(publickey);
+    teamkeystore.addAccessToPublicKey(publickey);
+    teamkeystore.setPublicKeyRing( new PGPPublicKeyRing(list) );
+    teamkeystore.setRootKey(publickey);
+  }
+  
   public void addPublicKeyToTeamStore( PGPPublicKey parentkey, PGPPublicKey publickey, boolean controller ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
     ArrayList<PGPPublicKey> list = new ArrayList<>();
     list.add(publickey);
-    TeamKeyStore teamkeystore = (TeamKeyStore)keystore[TEAM];
     teamkeystore.addAccessToPublicKey(publickey);
     teamkeystore.setPublicKeyRing( new PGPPublicKeyRing(list) );
     teamkeystore.addKey(parentkey, publickey, controller);
@@ -117,7 +125,6 @@ public class TeamTrust implements TrustContext, KeyFinder
   {
     ArrayList<PGPPublicKey> list = new ArrayList<>();
     list.add(parentkey);
-    TeamKeyStore teamkeystore = (TeamKeyStore)keystore[TEAM];
     teamkeystore.setPublicKeyRing( new PGPPublicKeyRing(list) );
   }
   

@@ -33,7 +33,7 @@ public class SignKeys
 {
   private static final KeyFingerPrintCalculator fingerprintcalc = new BcKeyFingerprintCalculator();
   
-  public static void signKeysAndImport( String signeralias, EncryptedCompositeFilePasswordHandler passhandler, boolean addselftoteam, String[] subjectaliases, boolean[] addtoteam, boolean[] controller, boolean[] isparent )
+  public static void signKeysAndImport( String signeralias, EncryptedCompositeFilePasswordHandler passhandler, boolean initteam, String[] subjectaliases, boolean[] addtoteam, boolean[] controller, boolean[] isparent )
   {
     Security.addProvider(new BouncyCastleProvider());
     
@@ -47,8 +47,8 @@ public class SignKeys
       StandardRSAKeyBuilderSigner signer = new StandardRSAKeyBuilderSigner();
       
       PGPPublicKey mypublickey = teamtrust.getSecretKeyForSigning().getPublicKey();
-      if ( addselftoteam )
-        teamtrust.addPublicKeyToTeamStore( null, mypublickey, true );
+      if ( initteam )
+        teamtrust.addRootPublicKeyToTeamStore( mypublickey );
       
       for ( int i=0; i<subjectaliases.length; i++ )
       {

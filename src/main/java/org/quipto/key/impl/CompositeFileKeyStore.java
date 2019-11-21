@@ -37,7 +37,7 @@ import org.quipto.key.KeyFinder;
  */
 public class CompositeFileKeyStore
 {
-  private static final String INDEXFILENAME = "keysindexedbyuserid.xml";
+  private static final String INDEXFILENAME = "keyindex.xml";
   private static final KeyFingerPrintCalculator fingerprintcalc = new BcKeyFingerprintCalculator();
   
   protected EncryptedCompositeFile compositefile;

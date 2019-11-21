@@ -23,6 +23,7 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
+import org.quipto.QuiptoStandards;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
 import org.quipto.key.impl.CompositeFileKeyStore;
@@ -38,8 +39,9 @@ import org.xml.sax.helpers.DefaultHandler;
  */
 public class TeamKeyStore extends CompositeFileKeyStore
 {
-  static final String TRUSTGRAPHFILENAME = "trustgraph.xml";
+  static final String TEAMCONFIGFILENAME = "team.xml";
   
+  String teamid=null;
   TeamNode rootteamnode=null;
   boolean waitingtoload = true;
   final HashMap<Long,TeamNode> nodesbyid = new HashMap<>();
@@ -53,16 +55,29 @@ public class TeamKeyStore extends CompositeFileKeyStore
   }
 
   
+  public String getTrustId()
+  {
+    if ( waitingtoload )
+      loadTree();
+    return teamid;
+  }
   
   
   public void setRootKey( PGPPublicKey key ) throws IOException
   {
+    if ( waitingtoload )
+      loadTree();
+    teamid = QuiptoStandards.generateRandomId( 256 );
     addNode( null, key, true );
     saveTree();
   }
   
   public void addKey( PGPPublicKey parentkey, PGPPublicKey key, boolean controller ) throws IOException
   {
+    if ( waitingtoload )
+      loadTree();
+    if ( rootteamnode == null )
+      throw new IOException( "Attempt to add key to team key store when there is no root key in the store.");
     addNode( parentkey, key, controller );
     saveTree();
   }
@@ -79,6 +94,8 @@ public class TeamKeyStore extends CompositeFileKeyStore
   
   public PGPPublicKey[] getTeamKeyChain( long keyid, List<Long> trustedkeyids )
   {
+    if ( waitingtoload )
+      loadTree();
     ArrayList<List<PGPPublicKey>> candidates = new ArrayList<>();
     for ( long tkeyid : trustedkeyids )
     {
@@ -151,11 +168,9 @@ public class TeamKeyStore extends CompositeFileKeyStore
   
   public void dumpTeam()
   {
-//    if ( waitingtoload )
-//      loadTree();
     try
     {
-      InputStreamReader reader = new InputStreamReader(compositefile.getDecryptingInputStream(compositefileuser, TRUSTGRAPHFILENAME));
+      InputStreamReader reader = new InputStreamReader(compositefile.getDecryptingInputStream(compositefileuser, TEAMCONFIGFILENAME));
       int c;
       while ( (c = reader.read()) >= 0 )
         System.out.print( (char)c );
@@ -166,20 +181,16 @@ public class TeamKeyStore extends CompositeFileKeyStore
     {
       Logger.getLogger(TeamKeyStore.class.getName()).log(Level.SEVERE, null, ex);
     }
-//    System.out.println( "Dumping team tree:" );
-//    if ( rootteamnode != null )
-//      dumpNode(rootteamnode, 1);
-//    System.out.println( "End dump" );
   }
   
-  private void dumpNode( TeamNode node, int depth )
-  {
-    for ( int i=0; i<depth; i++ )
-      System.out.print( "  " );
-    System.out.println( "Node " + Long.toHexString(node.keyid) + " Signed:" );
-    for ( TeamNode child : node.childnodes )
-      dumpNode( child, depth+1 );
-  }
+//  private void dumpNode( TeamNode node, int depth )
+//  {
+//    for ( int i=0; i<depth; i++ )
+//      System.out.print( "  " );
+//    System.out.println( "Node " + Long.toHexString(node.keyid) + " Signed:" );
+//    for ( TeamNode child : node.childnodes )
+//      dumpNode( child, depth+1 );
+//  }
   
   private void loadTree()
   {
@@ -187,14 +198,15 @@ public class TeamKeyStore extends CompositeFileKeyStore
     waitingtoload = false;
     try
     {
+      teamid=null;
       rootteamnode=null;
       
-      if ( !compositefile.exists(TRUSTGRAPHFILENAME) )
+      if ( !compositefile.exists(TEAMCONFIGFILENAME) )
         return;
       
       //dumpTeam();
       
-      InputStream in = compositefile.getDecryptingInputStream(compositefileuser, TRUSTGRAPHFILENAME);
+      InputStream in = compositefile.getDecryptingInputStream(compositefileuser, TEAMCONFIGFILENAME);
       SAXParserFactory spf = SAXParserFactory.newInstance();    
       spf.setNamespaceAware(true);
       SAXParser saxParser = spf.newSAXParser();
@@ -213,10 +225,12 @@ public class TeamKeyStore extends CompositeFileKeyStore
   
   void saveTree() throws IOException
   {
-    try (OutputStreamWriter writer = new OutputStreamWriter( compositefile.getEncryptingOutputStream(compositefileuser, TRUSTGRAPHFILENAME, true, true), "UTF-8" ))
+    try (OutputStreamWriter writer = new OutputStreamWriter( compositefile.getEncryptingOutputStream(compositefileuser, TEAMCONFIGFILENAME, true, true), "UTF-8" ))
     {
       writer.write("<?xml version=\"1.0\"?>\n");
-      saveNode( rootteamnode, writer, 0 );
+      writer.write("<team id=\"" + (teamid==null?"":teamid) + "\">\n");
+      saveNode( rootteamnode, writer, 1 );
+      writer.write("</team>\n");
     }
   }
   
@@ -294,7 +308,14 @@ public class TeamKeyStore extends CompositeFileKeyStore
     public void startElement(String uri, String localName, String qName, Attributes attributes)
             throws SAXException
     {
-      if ( !"node".equals(localName) )
+      if ( "team".equals( localName ) )
+      {
+        // read team properties...
+        teamid = attributes.getValue("", "id");
+        return;
+      }
+      
+      if ( !"node".equals( localName ) )
         return;
       
       String strrole = attributes.getValue("", "role" );

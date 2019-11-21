@@ -5,8 +5,11 @@
  */
 package org.quipto;
 
+import java.math.BigInteger;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A holder for constants relating to quipto protocols
@@ -43,17 +46,44 @@ public class QuiptoStandards
   
   
   public final static char[] SECRET_KEY_STANDARD_PASS = "This does not need to be secure because the whole secret key ring collection is encrypted.".toCharArray();
-  
-  public static final String passchars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ0123456789.,;:[]}{=+-_)(*&%$";
-  
-  public static char[] generateRandomPassphrase() throws NoSuchAlgorithmException
+
+  private static SecureRandom sr = null;
+  static
   {
-    SecureRandom sr = SecureRandom.getInstanceStrong();
-    char[] passphrase = new char[30];
-    for (int i = 0; i < passphrase.length; i++)
+    try
     {
-      passphrase[i] = passchars.charAt(sr.nextInt(passchars.length()));
+      sr = SecureRandom.getInstanceStrong();
     }
-    return passphrase;
-  }  
+    catch (NoSuchAlgorithmException ex)
+    {
+      Logger.getLogger(QuiptoStandards.class.getName()).log(Level.SEVERE, null, ex);
+    }
+  }
+  
+  private static final String PASSCHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ0123456789.,;:[]}{=+-_)(*&%$";  
+  public static char[] generateRandomPassphrase()
+  {
+    return generateRandomCharArray( PASSCHARS, 30 );
+  }
+  
+  private static char[] generateRandomCharArray( String chars, int length )
+  {
+    char[] str = new char[length];
+    for (int i = 0; i < str.length; i++)
+      str[i] = chars.charAt(sr.nextInt(chars.length()));
+    return str;
+  }
+  
+  public static String generateRandomId( int bits )
+  {
+    return generateRandomNumberAsString( (bits+7)/8 );
+  }
+  
+  public static String generateRandomNumberAsString( int bytelength )
+  {
+    byte[] buffer = new byte[bytelength];
+    sr.nextBytes(buffer);
+    BigInteger big = new BigInteger( 1, buffer );
+    return big.toString(16);
+  }
 }
