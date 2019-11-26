@@ -435,7 +435,13 @@ public class EncryptedCompositeFileViewer
     
     try
     {
-      teamtrust = new TeamTrust( alias, personalkeystorepasshandler, personalkeystorefile, teamkeystorefile );
+      EncryptedCompositeFileUser personaleu = new EncryptedCompositeFileUser( personalkeystorepasshandler );
+      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile, personaleu );
+      CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, alias, alias );
+      personalkeyfinder.init();
+      personalkeystore.initB();
+
+      TeamTrust teamtrust = new TeamTrust( alias, personalkeystore, personalkeyfinder, teamkeystorefile );
       euser = new EncryptedCompositeFileUser( teamtrust, teamtrust );
     }
     catch ( Exception e )

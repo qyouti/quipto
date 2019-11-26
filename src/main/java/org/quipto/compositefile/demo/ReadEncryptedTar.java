@@ -28,6 +28,8 @@ import org.bouncycastle.openpgp.PGPException;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFilePasswordHandler;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.key.impl.CompositeFileKeyFinder;
+import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.trust.team.TeamTrust;
 
 /**
@@ -55,7 +57,13 @@ public class ReadEncryptedTar
       File personalkeystorefile = new File("demo/" + alias + "home/keyring.tar");
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
       
-      TeamTrust teamtrust = new TeamTrust( alias, passhandler, personalkeystorefile, teamkeystorefile );
+      EncryptedCompositeFileUser personaleu = new EncryptedCompositeFileUser( passhandler );
+      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile, personaleu );
+      CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, alias, alias );
+      personalkeyfinder.init();
+      personalkeystore.initB();
+      
+      TeamTrust teamtrust = new TeamTrust( alias, personalkeystore, personalkeyfinder, teamkeystorefile );
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
       EncryptedCompositeFile compfile = new EncryptedCompositeFile(file, false, true, eu);
       compfile.initA();

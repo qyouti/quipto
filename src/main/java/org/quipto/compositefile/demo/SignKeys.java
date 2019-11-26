@@ -22,6 +22,8 @@ import org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator;
 import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator;
 import org.quipto.compositefile.EncryptedCompositeFilePasswordHandler;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.key.impl.CompositeFileKeyFinder;
+import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.key.impl.StandardRSAKeyBuilderSigner;
 import org.quipto.trust.team.TeamTrust;
 
@@ -42,7 +44,13 @@ public class SignKeys
       File personalkeystorefile = new File("demo/" + signeralias + "home/keyring.tar");
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
           
-      TeamTrust teamtrust = new TeamTrust( signeralias, passhandler, personalkeystorefile, teamkeystorefile );
+      EncryptedCompositeFileUser personaleu = new EncryptedCompositeFileUser( passhandler );
+      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile, personaleu );
+      CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, signeralias, signeralias );
+      personalkeyfinder.init();
+      personalkeystore.initB();
+      
+      TeamTrust teamtrust = new TeamTrust( signeralias, personalkeystore, personalkeyfinder, teamkeystorefile );
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
       StandardRSAKeyBuilderSigner signer = new StandardRSAKeyBuilderSigner();
       

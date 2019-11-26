@@ -143,12 +143,9 @@ public class EncryptedCompositeFile
     }
     else
     {
-      type = getConfiguration();
-      if ( type == TYPE_EXCLUSIVE )
+      String propsname = getCustomPassphraseFileName()+".properties";
+      if ( exists(propsname) )
       {
-        String propsname = getCustomPassphraseFileName()+".properties";
-        if ( !exists( propsname ) )
-          throw new IOException( "Archive should be exclusive access but lacks a passphrase properties entry." );
         try ( InputStream in = super.getInputStream( propsname ) )
         {
           custompassphraseproperties = new Properties();
@@ -160,6 +157,13 @@ public class EncryptedCompositeFile
           throw ioex;
         }
       }
+      
+      type = getConfiguration();    
+      if ( type == TYPE_EXCLUSIVE )
+      {
+        if ( custompassphraseproperties == null )
+          throw new IOException( "Archive should be exclusive access but lacks a passphrase properties entry." );
+      }
     }
   }
 
@@ -167,7 +171,6 @@ public class EncryptedCompositeFile
   public void initB() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
     ignoresignatures = false;
-    type = getConfiguration();    
   }
 
   public String getCustomPassphraseType()
