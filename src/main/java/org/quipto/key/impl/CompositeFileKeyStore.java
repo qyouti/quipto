@@ -5,6 +5,7 @@
  */
 package org.quipto.key.impl;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -43,10 +44,18 @@ public class CompositeFileKeyStore
   protected EncryptedCompositeFile compositefile;
   Properties index;
 
-  public CompositeFileKeyStore( EncryptedCompositeFile compositefile )
+  public CompositeFileKeyStore( File file, EncryptedCompositeFileUser eu ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    this.compositefile = compositefile;
+    compositefile = new EncryptedCompositeFile( file, true, false, eu );
+    compositefile.initA();
     index = new Properties();
+    if ( compositefile.exists(INDEXFILENAME) )
+      loadIndices();
+  }
+  
+  public void initB() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  {
+    compositefile.initB();    
     if ( compositefile.exists(INDEXFILENAME) )
       loadIndices();    
   }

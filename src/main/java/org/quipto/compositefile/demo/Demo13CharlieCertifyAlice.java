@@ -26,7 +26,7 @@ import org.quipto.passwords.WindowsPasswordHandler;
  */
 public class Demo13CharlieCertifyAlice
 {
-  static final String[] subjectaliases = { "bob" };
+  static final String[] subjectaliases = { "alice" };
   static final boolean[] addtoteam = { false };
   
   /**

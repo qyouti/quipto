@@ -5,6 +5,7 @@
  */
 package org.quipto.trust.team;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -47,10 +48,10 @@ public class TeamKeyStore extends CompositeFileKeyStore
   final HashMap<Long,TeamNode> nodesbyid = new HashMap<>();
   
   
-  public TeamKeyStore(EncryptedCompositeFile compositefile)
+  public TeamKeyStore( File file, EncryptedCompositeFileUser eu )
           throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    super(compositefile);
+    super( file, eu );
     System.out.println( "CONSTRUCTED TeamKeyStore" );
   }
 

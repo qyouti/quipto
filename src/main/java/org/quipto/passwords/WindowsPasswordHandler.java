@@ -59,7 +59,7 @@ public class WindowsPasswordHandler implements EncryptedCompositeFilePasswordHan
   public WindowsPasswordHandler() throws KeyStoreException
   {
     encryptionproperties = new Properties();
-    encryptionproperties.setProperty( "windowspasswordhandler", "true" );
+    encryptionproperties.setProperty( "type", "windowspasswordhandler" );
     name = System.getProperty("user.name");
     initKeys( name );
   }
@@ -67,8 +67,8 @@ public class WindowsPasswordHandler implements EncryptedCompositeFilePasswordHan
   @Override
   public char[] decryptPassword(byte[] cipher, Properties properties)
   {
-    String prop = properties.getProperty("windowspasswordhandler");
-    if ( prop == null || !(prop.equals("true")) )
+    String prop = properties.getProperty("type");
+    if ( prop == null || !(prop.equals("windowspasswordhandler")) )
       return null;  // wrong handler
 
     // decrypt

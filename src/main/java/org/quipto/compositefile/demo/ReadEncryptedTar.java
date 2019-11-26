@@ -57,7 +57,9 @@ public class ReadEncryptedTar
       
       TeamTrust teamtrust = new TeamTrust( alias, passhandler, personalkeystorefile, teamkeystorefile );
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
-      EncryptedCompositeFile compfile = new EncryptedCompositeFile(file, false, eu);
+      EncryptedCompositeFile compfile = new EncryptedCompositeFile(file, false, true, eu);
+      compfile.initA();
+      compfile.initB();
       compfile.addPublicKey( teamtrust.getSecretKeyForDecryption().getPublicKey() );
       
       for ( String entryname : entrynames )

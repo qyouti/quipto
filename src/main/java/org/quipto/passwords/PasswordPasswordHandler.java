@@ -63,7 +63,7 @@ public class PasswordPasswordHandler implements EncryptedCompositeFilePasswordHa
     this.masterpass = Arrays.copyOf( masterpass, masterpass.length );
     
     encryptionproperties = new Properties();
-    encryptionproperties.setProperty( "passwordpasswordhandler", "true" );
+    encryptionproperties.setProperty( "type", "passwordpasswordhandler" );
   }
   
   @Override
@@ -71,8 +71,8 @@ public class PasswordPasswordHandler implements EncryptedCompositeFilePasswordHa
   {
     ByteArrayInputStream bain = new ByteArrayInputStream( cipher );
     
-    String prop = properties.getProperty("passwordpasswordhandler");
-    if ( prop == null || !(prop.equals("true")) )
+    String prop = properties.getProperty("type");
+    if ( prop == null || !(prop.equals("passwordpasswordhandler")) )
       return null;  // wrong handler
     try
     {

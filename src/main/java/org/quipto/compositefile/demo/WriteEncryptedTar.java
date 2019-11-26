@@ -26,6 +26,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
+import org.bouncycastle.openpgp.PGPPublicKey;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFilePasswordHandler;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
@@ -42,9 +43,18 @@ public class WriteEncryptedTar
    * 
    * @param alias
    * @param passhandler
+   * @param addalias
+   * @param addpermission
    * @param entrynames
+   * @param big
    */
-  public static void writeEncryptedTar( String alias, EncryptedCompositeFilePasswordHandler passhandler, String[] entrynames, boolean[] big )
+  public static void writeEncryptedTar( 
+          String alias, 
+          EncryptedCompositeFilePasswordHandler passhandler, 
+          String[] addalias,
+          int[] addpermission,
+          String[] entrynames, 
+          boolean[] big )
   {
     Security.addProvider(new BouncyCastleProvider());
     
@@ -57,10 +67,23 @@ public class WriteEncryptedTar
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
       
       TeamTrust teamtrust = new TeamTrust( alias, passhandler, personalkeystorefile, teamkeystorefile );
-      EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
-      EncryptedCompositeFile compfile = new EncryptedCompositeFile( file, !file.exists(), eu );
       
-      teamtrust.addAllTeamKeysToEncryptedCompositeFile(compfile, eu);
+      
+      EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
+      EncryptedCompositeFile compfile = new EncryptedCompositeFile( file, !file.exists(), true, eu );
+      compfile.initA();      
+      compfile.initB();
+      
+      for ( int i=0; i<addalias.length; i++ )
+      {
+        PGPPublicKey addkey = teamtrust.findFirstPublicKey( addalias[i] );
+        if ( addkey != null )
+        {
+          compfile.addPublicKey( addkey );
+          compfile.setPermission( addkey, addpermission[i] );
+        }
+      }
+      
       for ( int j=0; j<entrynames.length; j++ )
       {
         String entryname = entrynames[j];

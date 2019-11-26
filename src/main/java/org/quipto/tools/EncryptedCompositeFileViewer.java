@@ -311,7 +311,9 @@ public class EncryptedCompositeFileViewer
       if ( compfile != null )
         compfile.close();
       datastorelabel.setText(file.getAbsolutePath());
-      compfile = new EncryptedCompositeFile( file, false, euser );
+      compfile = new EncryptedCompositeFile( file, false, true, euser );
+      compfile.initA();
+      compfile.initB();
 
       listmodel.clear();
       for ( String name : compfile.getComponentNames() )

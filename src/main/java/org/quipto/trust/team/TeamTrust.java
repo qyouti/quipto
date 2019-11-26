@@ -42,7 +42,7 @@ public class TeamTrust implements TrustContext, KeyFinder
   static final int TEAM     = 1;
   
   EncryptedCompositeFileUser[] eu = new EncryptedCompositeFileUser[2];
-  EncryptedCompositeFile[] compfile = new EncryptedCompositeFile[2];
+  //EncryptedCompositeFile[] compfile = new EncryptedCompositeFile[2];
   CompositeFileKeyStore[] keystore = new CompositeFileKeyStore[2];
   TeamKeyStore teamkeystore;
   CompositeFileKeyFinder[] keyfinder = new CompositeFileKeyFinder[2];
@@ -53,8 +53,8 @@ public class TeamTrust implements TrustContext, KeyFinder
   
   public TeamTrust( String alias, EncryptedCompositeFilePasswordHandler passhandler, File personalkeystorefile, File teamkeystorefile ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, PGPException
   {
-    try
-    {
+//    try
+//    {
       File[] files = new File[2];
       files[0] = personalkeystorefile;
       files[1] = teamkeystorefile;
@@ -64,13 +64,15 @@ public class TeamTrust implements TrustContext, KeyFinder
           eu[PERSONAL] = new EncryptedCompositeFileUser( passhandler );  // personal store uses password
         if ( i==TEAM )
           eu[TEAM]     = new EncryptedCompositeFileUser( this, new TrustAnythingContext() ); // shared store uses key from personal store
-        compfile[i] = new EncryptedCompositeFile( files[i], true, eu[i] );
+        
         if ( i==PERSONAL )
-          keystore[i] = new CompositeFileKeyStore( compfile[i] );
+          keystore[i] = new CompositeFileKeyStore( files[i], eu[i] );
         else
-          keystore[i] = teamkeystore = new TeamKeyStore( compfile[i] );
+          keystore[i] = teamkeystore = new TeamKeyStore( files[i], eu[i] );
         keyfinder[i] = new CompositeFileKeyFinder( keystore[i], alias, alias );
         keyfinder[i].init();
+        keystore[i].initB();
+        
         if ( i==PERSONAL )
         {
           ownsecretkeysigning = keyfinder[PERSONAL].getSecretKeyForSigning();
@@ -86,11 +88,11 @@ public class TeamTrust implements TrustContext, KeyFinder
         if ( teamkeystore.isController(keyid) )
           personallytrustedteamkeyids.add(keyid);
       }
-    }
-    catch (IOException ex)
-    {
-      Logger.getLogger(TeamTrust.class.getName()).log(Level.SEVERE, null, ex);
-    }
+//    }
+//    catch (IOException ex)
+//    {
+//      Logger.getLogger(TeamTrust.class.getName()).log(Level.SEVERE, null, ex);
+//    }
   }
 
   public void close()
@@ -138,13 +140,14 @@ public class TeamTrust implements TrustContext, KeyFinder
     keystore[PERSONAL].setPublicKeyRing( new PGPPublicKeyRing(list) );
   }
   
-  public void addAllTeamKeysToEncryptedCompositeFile( EncryptedCompositeFile compositefile, EncryptedCompositeFileUser eu ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public void addAllTeamKeysToEncryptedCompositeFile( EncryptedCompositeFile compositefile ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
     List<PGPPublicKeyRing> fulllist = keystore[TEAM].getAllPublicKeyRings();
     for ( PGPPublicKeyRing keyring : fulllist )
     {
       keyring.getPublicKey();  // the master key
       compositefile.addPublicKey( keyring.getPublicKey() );
+      compositefile.setPermission( keyring.getPublicKey(), EncryptedCompositeFile.ALL_PERMISSIONS );
     }
   }
   
@@ -304,9 +307,12 @@ public class TeamTrust implements TrustContext, KeyFinder
   @Override
   public PGPPublicKey findPublicKey(long keyid)
   {
-    PGPPublicKey pubkey = keyfinder[TEAM].findPublicKey(keyid);
-    if ( pubkey != null )
-      return pubkey;
+    if ( keyfinder[TEAM] != null )
+    {
+      PGPPublicKey pubkey = keyfinder[TEAM].findPublicKey(keyid);
+      if ( pubkey != null )
+        return pubkey;
+    }
     return keyfinder[PERSONAL].findPublicKey(keyid);
   }
 

@@ -75,37 +75,145 @@ import org.quipto.trust.TrustContextReport;
 public class EncryptedCompositeFile
         extends CompositeFile
 {
+  static final public int TYPE_UNKNOWN   = 0;
+  static final public int TYPE_EXCLUSIVE = 1;
+  static final public int TYPE_SHARED    = 2;
+  static final public int TYPE_SHARED_AC = 3;
+  
+  
   static final public int UNKNOWN_PASS_STATUS = -1;
   static final public int PASS_NONE = 0;
   static final public int PASS_HIDDEN = 1;
   static final public int PASS_KNOWN = 2;
 
+  static final public int HAS_PERMISSION              = 1;
+  static final public int READ_PERMISSION             = 2;
+  static final public int WRITE_PERMISSION            = 4;
+  static final public int WRITE_PERMISSION_PERMISSION = 8;
+  
+  static final public int ALL_PERMISSIONS             = 0x0f;
 
+  
+  int type;
+  boolean accesscontrol;
   EncryptedCompositeFileUser eu;
-          
+
+  Properties custompassphraseproperties = null;
+  
+  boolean ignoresignatures;
+  
+  final HashMap<String,Integer> permissiontable = new HashMap<>();
+  
+  
   /**
    * Constructor.
    * 
    * @param file
+   * @param create
+   * @param accesscontrol
    * @param eu
    * @throws IOException 
    */
-  public EncryptedCompositeFile( File file, boolean create, EncryptedCompositeFileUser eu )
-          throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public EncryptedCompositeFile( File file, boolean create, boolean accesscontrol, EncryptedCompositeFileUser eu )
+          throws IOException
   {
     super(file, create);
     this.eu = eu;
+    this.accesscontrol = accesscontrol;
+    ignoresignatures = true;
+  }
+
+  
+  public void initA() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  {
     if ( isNewlyCreated() )
     {
       // add user's own password with appropriate encryption
       if ( eu.isExclusive() )
+      {
         addCustomUser();
+        setConfiguration( TYPE_EXCLUSIVE );
+      }
       else
-        addPublicKey(eu.getKeyFinder().getSecretKeyForDecryption().getPublicKey());
+      {
+        addPublicKeyPrivately( eu.getKeyFinder().getSecretKeyForDecryption().getPublicKey() );
+        setPermission( eu.getKeyFinder().getSecretKeyForSigning().getPublicKey(), ALL_PERMISSIONS, false );
+        setConfiguration( accesscontrol?TYPE_SHARED_AC:TYPE_SHARED );
+      }
+    }
+    else
+    {
+      type = getConfiguration();
+      if ( type == TYPE_EXCLUSIVE )
+      {
+        String propsname = getCustomPassphraseFileName()+".properties";
+        if ( !exists( propsname ) )
+          throw new IOException( "Archive should be exclusive access but lacks a passphrase properties entry." );
+        try ( InputStream in = super.getInputStream( propsname ) )
+        {
+          custompassphraseproperties = new Properties();
+          custompassphraseproperties.loadFromXML(in);
+        }
+        catch ( IOException ioex )
+        {
+          custompassphraseproperties = null;
+          throw ioex;
+        }
+      }
     }
   }
-  
 
+  
+  public void initB() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  {
+    ignoresignatures = false;
+    type = getConfiguration();    
+  }
+
+  public String getCustomPassphraseType()
+  {
+    if ( custompassphraseproperties == null ) return "none";
+    return custompassphraseproperties.getProperty("type","none");
+  }
+  
+  private static String getConfigurationFileName()
+  {
+    return ".encryption/configuration.bin";
+  }
+
+  private int getConfiguration()
+  {
+    String name = getConfigurationFileName();
+    if ( !exists( name ) )
+      return TYPE_UNKNOWN;
+    try ( InputStream in = getDecryptingInputStream(name,false) )
+    {
+      int b = in.read();
+      if ( b < 0 ) return TYPE_UNKNOWN;
+      return b;
+    }
+    catch (IOException ex)
+    {
+      Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
+      return TYPE_UNKNOWN;
+    }    
+  }
+
+  private void setConfiguration( int c ) throws IOException
+  {
+    String name = getConfigurationFileName();
+    try ( OutputStream out = this.getEncryptingOutputStream( name, true, c == TYPE_SHARED | c == TYPE_SHARED_AC, false ) )
+    {
+      out.write(c);
+    }
+    catch ( Exception e )
+    {
+      throw e;
+    }
+    type = c;
+  }
+  
+  
   private static String getPassphraseFileName( PGPPublicKey publickey )
   {
     long keyid = publickey.getKeyID();
@@ -113,22 +221,97 @@ public class EncryptedCompositeFile
     return ".encryption/passwords/" + strkeyid + ".gpg";
   }
 
-  private String getNextCustomFileName()
+  private static String getPermissionFileName( PGPPublicKey publickey )
   {
-    String filename;
-    for ( int i=0x1000; i<0xffff; i++ )
+    long keyid = publickey.getKeyID();
+    String strkeyid = Long.toHexString(keyid);
+    return ".encryption/permissions/" + strkeyid + ".bin";
+  }
+
+//  private static boolean isPermissionFileName( String name )
+//  {
+//    return name.startsWith(".encryption/permissions/") && name.endsWith(".bin");
+//  }
+
+  public int getPermission( PGPPublicKey publickey ) throws IOException
+  {
+    if ( type == 0 )
+      throw new IOException("Encrypted composite file not initialised");
+    
+    if ( type != TYPE_SHARED_AC )
+      return ALL_PERMISSIONS;
+    
+    String name = getPermissionFileName( publickey );
+    if ( !exists( name ) )
+      return 0;
+    
+    Integer i = permissiontable.get(name);
+    if ( i != null )
+      return i.intValue();
+    
+    try ( InputStream in = getDecryptingInputStream(name,false) )
     {
-      filename = ".encryption/custompasswords/" + Integer.toHexString(i) + ".bin";
-      if ( !this.exists(filename) )
-        return filename;
+      int b = in.read();
+      if ( b < 0 )
+        i = new Integer(0);
+      else
+        return i = new Integer(b);
     }
-    return null;
+    catch (IOException ex)
+    {
+      Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
+      i = new Integer(0);
+    }
+    
+    try ( InputStream in = getDecryptingInputStream(name,true) )
+    {
+    }
+    catch (IOException ex)
+    {
+      Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
+    }
+    
+    permissiontable.put(name, i);
+    return i.intValue();
+  }
+  
+  public void setPermission( PGPPublicKey publickey, int p ) throws IOException
+  {
+    if ( type != TYPE_SHARED_AC )
+      throw new IOException("This encrypted composite file does not record permissions.");
+    // public interface enforces check...
+    setPermission( publickey, p, !ignoresignatures );
+  }
+  
+  private void setPermission( PGPPublicKey publickey, int p, boolean check ) throws IOException
+  {
+    if ( check )
+    {
+      int selfpermission = getPermission( eu.keyfinder.getSecretKeyForSigning().getPublicKey() );
+      if ( (selfpermission & WRITE_PERMISSION_PERMISSION) == 0 )
+        throw new IOException( "User does not have permission to set permissions for " + getCanonicalPath() );
+    }
+    String name = getPermissionFileName( publickey );
+    try ( OutputStream out = this.getEncryptingOutputStream( name, true, true, false ) )
+    {
+      out.write(p);
+    }
+    catch ( Exception e )
+    {
+      throw e;
+    }
+  }
+  
+  private String getCustomPassphraseFileName()
+  {
+    return ".encryption/custompasswords/pass.bin";
   }
 
   private static boolean isOpenPGPPassphraseFileName( String name )
   {
     return name.startsWith(".encryption/passwords/") && name.endsWith(".gpg");
   }
+  
   
   private static boolean isCustomPassphraseFileName( String name )
   {
@@ -181,40 +364,30 @@ public class EncryptedCompositeFile
         }
       }
     }
-    else if ( passhandler != null )
+    else if ( passhandler != null && custompassphraseproperties != null )
     {
-      for (ComponentEntry entry : componentmap.values())
+      name = getCustomPassphraseFileName();
+      if ( exists( name ) )
       {
-        name = entry.tararchiveentry.getName();
-        if ( isCustomPassphraseFileName(name) )
+        if (passphrasestatus != PASS_KNOWN)
         {
-          if (passphrasestatus != PASS_KNOWN)
-          {
-            passphrasestatus = PASS_HIDDEN;
-          }
-
-          InputStream in = super.getInputStream(name);
-          ByteArrayOutputStream baout = new ByteArrayOutputStream();
-          int b;
-          for ( int i=0; (b=in.read()) >= 0 && i<(1024*64); i++ )
-            baout.write(b);
-          in.close();
-          baout.close();
-          byte[] cipher = baout.toByteArray();
-          
-          in = super.getInputStream(name+".properties");
-          Properties props = new Properties();
-          props.loadFromXML(in);
-          in.close();
-
-          passphrase = passhandler.decryptPassword(cipher, props);
-          if ( passphrase != null )
-          {
-            passphrasestatus = PASS_KNOWN;
-            break;
-          }
+          passphrasestatus = PASS_HIDDEN;
         }
-      }      
+
+        InputStream in = super.getInputStream(name);
+        ByteArrayOutputStream baout = new ByteArrayOutputStream();
+        int b;
+        for ( int i=0; (b=in.read()) >= 0 && i<(1024*64); i++ )
+          baout.write(b);
+        in.close();
+        baout.close();
+        byte[] cipher = baout.toByteArray();
+
+
+        passphrase = passhandler.decryptPassword(cipher, custompassphraseproperties);
+        if ( passphrase != null )
+          passphrasestatus = PASS_KNOWN;
+      }
     }
     if (passphrasestatus == UNKNOWN_PASS_STATUS)
       passphrasestatus = PASS_NONE;
@@ -222,6 +395,15 @@ public class EncryptedCompositeFile
     eu.setPassPhraseStatus( getCanonicalPath(), passphrasestatus );
     eu.setPassPhrase( getCanonicalPath(), passphrase );
   }
+  
+  
+  public synchronized OutputStream getEncryptingOutputStream(String name, boolean replace, boolean sign )
+          throws IOException
+  {
+    if ( type == 0 )
+      throw new IOException("Encrypted composite file not initialised");
+    return getEncryptingOutputStream( name, replace, sign, true );
+  }  
   
   /**
    * Retrieves an output stream for a new entry in the composite file.As data is sent to
@@ -235,7 +417,7 @@ public class EncryptedCompositeFile
    * @return The stream to write 'plain text' to.
    * @throws IOException 
    */
-  public synchronized OutputStream getEncryptingOutputStream(String name, boolean replace, boolean sign )
+  private synchronized OutputStream getEncryptingOutputStream(String name, boolean replace, boolean sign, boolean check )
           throws IOException
   {
     KeyFinder keyfinder = eu.getKeyFinder();
@@ -254,6 +436,14 @@ public class EncryptedCompositeFile
     char[] passphrase = eu.getPassPhrase(getCanonicalPath());
     if ( passphrase == null )
       throw new IOException("Unable to initialise encrypted output because no pass phrase has been generated.");
+
+    if ( check && type == TYPE_SHARED_AC  )
+    {
+      int selfpermission = getPermission( keyfinder.getSecretKeyForSigning().getPublicKey() );
+      if ( (selfpermission & WRITE_PERMISSION) == 0 )
+        throw new IOException( "User does not have permission to write data into  " + getCanonicalPath() );
+    }
+
     
     OutputStream taroutput = super.getOutputStream(name, replace);
 
@@ -330,10 +520,8 @@ public class EncryptedCompositeFile
    * @param passphrase
    * @return 
    */
-  private synchronized PGPPublicKey getSignerPublicKey( String name, char[] passphrase ) throws IOException
+  private synchronized long getSignerKeyId( String name, char[] passphrase ) throws IOException
   {
-    long signerkeyid;
-    
     try ( InputStream  tarin = super.getInputStream(name) )
     {
       InputStream in = PGPUtil.getDecoderStream(tarin);
@@ -365,36 +553,49 @@ public class EncryptedCompositeFile
       //System.out.println( "Object class " + o.getClass().toString() );
       
       if ( !(o instanceof PGPOnePassSignatureList) )
-        return null;
+        return 0L;
       
       System.out.println( "File was signed." );
       PGPOnePassSignatureList onepasssiglist = (PGPOnePassSignatureList)o;
       if ( onepasssiglist.size() != 1 )
         throw new IOException( "Invalid Signature Format in data file." );
       PGPOnePassSignature onepasssignature = onepasssiglist.get(0);
-      signerkeyid = onepasssignature.getKeyID();  
+      return onepasssignature.getKeyID();  
     } catch (PGPException ex)
     {
       Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
-      return null;
+      return 0L;
     }
     // input stream is closed, ready to read from same store if necessary.
+  }
+
+  private synchronized PGPPublicKey getSignerPublicKey( String name, char[] passphrase ) throws IOException
+  {
+    long signerkeyid = getSignerKeyId( name, passphrase );
+    if ( signerkeyid == 0L )
+      return null;
     PGPPublicKey signerpubkey = eu.getKeyFinder().findPublicKey(signerkeyid);
     if ( signerpubkey == null )
       throw new IOException( "Unable to find public key used to sign this data file. Name = '" + name + "', signature key id = '" + Long.toHexString(signerkeyid) + "'." );        
     return signerpubkey;
   }
+
+  public  synchronized InputStream getDecryptingInputStream( String name ) throws IOException
+  {
+    if ( type == 0 )
+      throw new IOException("Encrypted composite file not initialised");
+    return getDecryptingInputStream( name, true );
+  }
   
   /**
-   * Get input stream to read data from an entry.The data will be decrypted before being delivered to the
- stream.
+   * Get input stream to read data from an entry.The data will be decrypted before being delivered to the stream.
    * 
    * @param eu
    * @param name
    * @return
    * @throws IOException 
    */
-  public  synchronized InputStream getDecryptingInputStream( String name ) throws IOException
+  private  synchronized InputStream getDecryptingInputStream( String name, boolean permission ) throws IOException
   {
     System.out.println( "Reading " + name );
     try
@@ -411,7 +612,18 @@ public class EncryptedCompositeFile
     if ( passphrase == null )
       throw new IOException("Unable to initialise decryption input because no pass phrase has been generated.");
     
-    PGPPublicKey signerpublickey = getSignerPublicKey( name, passphrase );
+    PGPPublicKey signerpublickey=null;
+    
+    if ( !ignoresignatures )
+    {
+      signerpublickey = getSignerPublicKey( name, passphrase );
+      if ( permission  && type == TYPE_SHARED_AC )
+      {
+        int signerpermission = getPermission( signerpublickey );
+        if ( (signerpermission & WRITE_PERMISSION) == 0 )
+          throw new IOException( "User who signed the data file does not have permission to write data into " + getCanonicalPath() );
+      }
+    }
     
     EncryptedInputWrapper inputwrapper = new EncryptedInputWrapper();
     try ( InputStream  tarin = super.getInputStream(name) )
@@ -447,19 +659,22 @@ public class EncryptedCompositeFile
       
       if ( o instanceof PGPOnePassSignatureList )
       {
-        System.out.println( "File " + name + " was signed." );
-        inputwrapper.onepasssiglist = (PGPOnePassSignatureList)o;
-        inputwrapper.onepasssignature = inputwrapper.onepasssiglist.get(0);
-        long signerkeyid = inputwrapper.onepasssignature.getKeyID();
-        
-        if ( signerpublickey == null || signerkeyid != signerpublickey.getKeyID() )
-          throw new IOException("Unable to determine the ID of the key that signed this data.");
-        
-        TrustContextReport report = eu.getTrustContext().checkTrusted( signerkeyid );
-        if( !report.isTrusted() )
-          throw new TrustContextException( report );
-        BcPGPContentVerifierBuilderProvider converbuildprov = new BcPGPContentVerifierBuilderProvider();
-        inputwrapper.onepasssignature.init( converbuildprov, signerpublickey );
+        if ( !ignoresignatures )
+        {
+          System.out.println( "File " + name + " was signed." );
+          inputwrapper.onepasssiglist = (PGPOnePassSignatureList)o;
+          inputwrapper.onepasssignature = inputwrapper.onepasssiglist.get(0);
+          long signerkeyid = inputwrapper.onepasssignature.getKeyID();
+
+          if ( signerpublickey == null || signerkeyid != signerpublickey.getKeyID() )
+            throw new IOException("Unable to determine the ID of the key that signed this data.");
+
+          TrustContextReport report = eu.getTrustContext().checkTrusted( signerkeyid );
+          if( !report.isTrusted() )
+            throw new TrustContextException( report );
+          BcPGPContentVerifierBuilderProvider converbuildprov = new BcPGPContentVerifierBuilderProvider();
+          inputwrapper.onepasssignature.init( converbuildprov, signerpublickey );
+        }
         o = pgpFact.nextObject();
         //System.out.println( "Object class " + o.getClass().toString() );
       }
@@ -652,7 +867,12 @@ public class EncryptedCompositeFile
     return pw.toCharArray();
   }
 
-  
+  public void addPublicKey(PGPPublicKey key) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  {
+    if ( type == 0 )
+      throw new IOException("Encrypted composite file not initialised");
+    addPublicKeyPrivately( key );
+  }  
   
   /**
    * Add a public key to the composite file which will be used to encrypt the passphrase.If this is the first public key then generate a random passphrase first.
@@ -662,7 +882,7 @@ public class EncryptedCompositeFile
    * @throws NoSuchProviderException
    * @throws NoSuchAlgorithmException 
    */
-  public void addPublicKey(PGPPublicKey key) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  private void addPublicKeyPrivately(PGPPublicKey key) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
     initPassphraseForThisCompositeFile();
     int passphrasestatus = eu.getPassPhraseStatus( getCanonicalPath() );
@@ -706,13 +926,13 @@ public class EncryptedCompositeFile
       eu.setPassPhraseStatus(getCanonicalPath(), PASS_KNOWN );
     }
 
-    Properties props = eu.getPasswordHandler().getEncryptionProperties();
+    custompassphraseproperties = eu.getPasswordHandler().getEncryptionProperties();
     byte[] encrypted = eu.getPasswordHandler().encryptPassword( eu.getPassPhrase( getCanonicalPath() ) );
     
-    String filename = getNextCustomFileName();
+    String filename = getCustomPassphraseFileName();
     
     OutputStream out = super.getOutputStream(filename+".properties", true);
-    props.storeToXML(out, "");
+    custompassphraseproperties.storeToXML(out, "");
     out.close();
     
     out = super.getOutputStream(filename, true);
@@ -784,7 +1004,7 @@ public class EncryptedCompositeFile
       closeInputStream();
       literalin.close();
 
-      if ( onepasssignature != null )
+      if ( !ignoresignatures && onepasssignature != null )
       {
         Object o = pgpobjectfactory.nextObject();
         System.out.println( "\n\nObject class following literal data object." + o.getClass().toString() );

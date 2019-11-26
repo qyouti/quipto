@@ -15,20 +15,10 @@
  */
 package org.quipto.compositefile.demo;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.security.Security;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openpgp.PGPPublicKey;
-import org.bouncycastle.openpgp.PGPSecretKey;
 import org.quipto.compositefile.EncryptedCompositeFile;
-import org.quipto.compositefile.EncryptedCompositeFileUser;
-import static org.quipto.compositefile.demo.Demo22AliceReadEncryptedTar.filenames;
-import org.quipto.key.impl.CompositeFileKeyFinder;
-import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.passwords.PasswordPasswordHandler;
-import org.quipto.trust.impl.TrustAnythingContext;
 
 /**
  * Alice creates an encrypted composite file. She will add herself and Bob to the users
@@ -39,6 +29,16 @@ import org.quipto.trust.impl.TrustAnythingContext;
  */
 public class Demo21AliceMakeEncryptedTar
 {
+  static String[] addalias = 
+  {
+    "bob",
+    "charlie"
+  };
+  static int[] addpermission = 
+  {
+    EncryptedCompositeFile.ALL_PERMISSIONS,
+    EncryptedCompositeFile.READ_PERMISSION
+  };
   static String[] filenames = {"big.bin","little.txt"};
   static boolean[] big = {true,false};
   /**
@@ -48,7 +48,7 @@ public class Demo21AliceMakeEncryptedTar
   {
     Security.addProvider(new BouncyCastleProvider());
     PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "alice@thingy.com", "alice".toCharArray() );
-    WriteEncryptedTar.writeEncryptedTar("alice", passhandler, filenames, big);
+    WriteEncryptedTar.writeEncryptedTar("alice", passhandler, addalias, addpermission, filenames, big);
   }
 
 }
