@@ -68,20 +68,24 @@ public class TeamTrust implements TrustContext, KeyFinder
     teamkeystore.initB();
         
 
-    
-    // List all keys personally trusted
-    long[] personallytrusted = personalkeystore.getSignedKeyIds( ownsecretkeysigning.getKeyID() );
-    // Narrow to those that are controllers in the team store.
-    for ( long keyid : personallytrusted )
-    {
-      if ( teamkeystore.isController(keyid) )
-        personallytrustedteamkeyids.add(keyid);
-    }
+    updatePersonallyTrusted();
   }
 
   public void close()
   {
     teamkeystore.close();
+  }
+  
+  private void updatePersonallyTrusted()
+  {
+    // List all keys personally trusted
+    long[] personallytrusted = personalkeystore.getSignedKeyIds( ownsecretkeysigning.getKeyID() );
+    // Narrow to those that are controllers in the team store.
+    for ( long keyid : personallytrusted )
+    {
+      if ( teamkeystore.isController(keyid) && !personallytrustedteamkeyids.contains( keyid ) )
+        personallytrustedteamkeyids.add(keyid);
+    }    
   }
   
   public void addRootPublicKeyToTeamStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
@@ -91,6 +95,7 @@ public class TeamTrust implements TrustContext, KeyFinder
     teamkeystore.addAccessToPublicKey(publickey);
     teamkeystore.setPublicKeyRing( new PGPPublicKeyRing(list) );
     teamkeystore.setRootKey(publickey);
+    updatePersonallyTrusted();
   }
   
   public void addPublicKeyToTeamStore( PGPPublicKey parentkey, PGPPublicKey publickey, boolean controller ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
@@ -100,6 +105,7 @@ public class TeamTrust implements TrustContext, KeyFinder
     teamkeystore.addAccessToPublicKey(publickey);
     teamkeystore.setPublicKeyRing( new PGPPublicKeyRing(list) );
     teamkeystore.addKey(parentkey, publickey, controller);
+    updatePersonallyTrusted();
   }
   
   public void addParentCertificationToTeamStore( PGPPublicKey parentkey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
@@ -107,6 +113,7 @@ public class TeamTrust implements TrustContext, KeyFinder
     ArrayList<PGPPublicKey> list = new ArrayList<>();
     list.add(parentkey);
     teamkeystore.setPublicKeyRing( new PGPPublicKeyRing(list) );
+    updatePersonallyTrusted();
   }
   
   public void dumpTeam()

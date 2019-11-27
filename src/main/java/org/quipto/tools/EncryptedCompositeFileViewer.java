@@ -441,7 +441,7 @@ public class EncryptedCompositeFileViewer
       personalkeyfinder.init();
       personalkeystore.initB();
 
-      TeamTrust teamtrust = new TeamTrust( alias, personalkeystore, personalkeyfinder, teamkeystorefile );
+      teamtrust = new TeamTrust( alias, personalkeystore, personalkeyfinder, teamkeystorefile );
       euser = new EncryptedCompositeFileUser( teamtrust, teamtrust );
     }
     catch ( Exception e )

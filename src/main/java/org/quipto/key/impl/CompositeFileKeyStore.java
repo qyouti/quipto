@@ -350,6 +350,27 @@ public class CompositeFileKeyStore
     return list;
   }
   
+  public List<PGPSecretKeyRing> getAllSecretKeyRings()
+  {
+    ArrayList<PGPSecretKeyRing> list = new ArrayList<>();
+    for ( String name : compositefile.getComponentNames() )
+    {
+      String[] parts = name.split("/");
+      if ( parts.length == 2 && "secretkeys".equals(parts[0]) )
+      {
+        String[] subparts = parts[1].split( "\\." );
+        if ( subparts.length == 2 && "gpg".equals(subparts[1]) )
+        {
+          long masterkeyid = Long.parseUnsignedLong( subparts[0], 16 );
+          PGPSecretKeyRing keyring = getSecretKeyRing( masterkeyid );
+          if ( keyring != null )
+            list.add(keyring);
+        }
+      }
+    }
+    return list;
+  }
+  
   
   public String getPublicKeyFilename( long id )
   {
