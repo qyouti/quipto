@@ -123,8 +123,20 @@ public class EncryptedCompositeFile
     ignoresignatures = true;
   }
 
-  
   public void initA() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  {
+    try
+    {
+      initAPrivate();
+    }
+    catch ( Exception e )
+    {
+      super.close();
+      throw e;
+    }
+  }
+  
+  private void initAPrivate() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
     if ( isNewlyCreated() )
     {
@@ -184,7 +196,7 @@ public class EncryptedCompositeFile
     return ".encryption/configuration.bin";
   }
 
-  private int getConfiguration()
+  private int getConfiguration() throws IOException
   {
     String name = getConfigurationFileName();
     if ( !exists( name ) )
@@ -194,12 +206,7 @@ public class EncryptedCompositeFile
       int b = in.read();
       if ( b < 0 ) return TYPE_UNKNOWN;
       return b;
-    }
-    catch (IOException ex)
-    {
-      Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
-      return TYPE_UNKNOWN;
-    }    
+    }  
   }
 
   private void setConfiguration( int c ) throws IOException
@@ -610,7 +617,7 @@ public class EncryptedCompositeFile
       throw new IOException("Unable to determine password to use.",ex);
     }
     if ( eu.getPassPhraseStatus(getCanonicalPath()) != PASS_KNOWN )
-      throw new IOException("Unable to initialise decryption input because there are no recipients added.");
+      throw new IOException("The file is encrypted but not for the key that was just presented.");
     char[] passphrase = eu.getPassPhrase(getCanonicalPath());
     if ( passphrase == null )
       throw new IOException("Unable to initialise decryption input because no pass phrase has been generated.");

@@ -45,6 +45,7 @@ public class CompositeFile
     private final RandomAccessFile raf;
     private final FileLock lock;
     private boolean newlycreated;
+    private boolean open = false;
     private InputStream currentinputstream = null;
     private OutputStream currentoutputstream = null;
     private SeekableTarArchiveOutputStream tos;
@@ -80,7 +81,7 @@ public class CompositeFile
             raf.seek(0);
             newlycreated = true;
         }
-        
+        open = true;
         readComponentMap();
     }
 
@@ -106,11 +107,19 @@ public class CompositeFile
     {
         synchronized ( this )
         {
+          if ( open )
+          {
+            open = false;
             lock.release();
             raf.close();
+          }
         }
     }
     
+    public boolean isOpen()
+    {
+      return open;
+    }
     
     /**
      * Read headers for all entries in the tar file and make a map.
