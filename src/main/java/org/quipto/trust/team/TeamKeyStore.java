@@ -14,11 +14,17 @@ import java.io.Writer;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.event.TreeModelListener;
+import javax.swing.tree.TreeModel;
+import javax.swing.tree.TreeNode;
+import javax.swing.tree.TreePath;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
@@ -47,6 +53,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
   boolean waitingtoload = true;
   final HashMap<Long,TeamNode> nodesbyid = new HashMap<>();
   
+  TeamModel teammodel = new TeamModel();
   
   public TeamKeyStore( File file, EncryptedCompositeFileUser eu )
           throws IOException, NoSuchProviderException, NoSuchAlgorithmException
@@ -55,6 +62,10 @@ public class TeamKeyStore extends CompositeFileKeyStore
     System.out.println( "CONSTRUCTED TeamKeyStore" );
   }
 
+  public TreeModel getTreeModel()
+  {
+    return teammodel;
+  }
   
   public String getTrustId()
   {
@@ -79,7 +90,12 @@ public class TeamKeyStore extends CompositeFileKeyStore
       loadTree();
     if ( rootteamnode == null )
       throw new IOException( "Attempt to add key to team key store when there is no root key in the store.");
-    addNode( parentkey, key, controller );
+    if ( parentkey == null )
+      throw new IOException( "Attempt to add key to team key store without a parent key.");
+    TeamNode parent = this.nodesbyid.get( parentkey.getKeyID() );
+    if ( parent == null )
+      throw new IOException( "Attempt to add key to team key store with a parent key that is not already in the store.");
+    addNode( parent, key, controller );
     saveTree();
   }
   
@@ -169,19 +185,19 @@ public class TeamKeyStore extends CompositeFileKeyStore
   
   public void dumpTeam()
   {
-    try
-    {
-      InputStreamReader reader = new InputStreamReader(compositefile.getDecryptingInputStream(TEAMCONFIGFILENAME));
-      int c;
-      while ( (c = reader.read()) >= 0 )
-        System.out.print( (char)c );
-      System.out.println();
-      reader.close();
-    }
-    catch (IOException ex)
-    {
-      Logger.getLogger(TeamKeyStore.class.getName()).log(Level.SEVERE, null, ex);
-    }
+//    try
+//    {
+//      InputStreamReader reader = new InputStreamReader(compositefile.getDecryptingInputStream(TEAMCONFIGFILENAME));
+//      int c;
+//      while ( (c = reader.read()) >= 0 )
+//        System.out.print( (char)c );
+//      System.out.println();
+//      reader.close();
+//    }
+//    catch (IOException ex)
+//    {
+//      Logger.getLogger(TeamKeyStore.class.getName()).log(Level.SEVERE, null, ex);
+//    }
   }
   
 //  private void dumpNode( TeamNode node, int depth )
@@ -193,28 +209,30 @@ public class TeamKeyStore extends CompositeFileKeyStore
 //      dumpNode( child, depth+1 );
 //  }
   
-  private void loadTree()
+  public void loadTree()
   {
     System.out.println( "LOADING TREE" );
     waitingtoload = false;
-    try
+    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false, eu ) )
     {
+      compositefile.initA();
+      compositefile.initB();    
       teamid=null;
       rootteamnode=null;
       
       if ( !compositefile.exists(TEAMCONFIGFILENAME) )
         return;
       
-      //dumpTeam();
+      try ( InputStream in = compositefile.getDecryptingInputStream(TEAMCONFIGFILENAME) )
+      {
+        SAXParserFactory spf = SAXParserFactory.newInstance();    
+        spf.setNamespaceAware(true);
+        SAXParser saxParser = spf.newSAXParser();
+        XMLReader xmlReader = saxParser.getXMLReader();
+        xmlReader.setContentHandler( new TeamTreeParser() );
+        xmlReader.parse( new InputSource(in) );
+      }
       
-      InputStream in = compositefile.getDecryptingInputStream(TEAMCONFIGFILENAME);
-      SAXParserFactory spf = SAXParserFactory.newInstance();    
-      spf.setNamespaceAware(true);
-      SAXParser saxParser = spf.newSAXParser();
-      XMLReader xmlReader = saxParser.getXMLReader();
-      xmlReader.setContentHandler( new TeamTreeParser() );
-      xmlReader.parse( new InputSource(in) );
-      in.close();
     }
     catch (ParserConfigurationException | SAXException | IOException ex)
     {
@@ -226,12 +244,17 @@ public class TeamKeyStore extends CompositeFileKeyStore
   
   void saveTree() throws IOException
   {
-    try (OutputStreamWriter writer = new OutputStreamWriter( compositefile.getEncryptingOutputStream(TEAMCONFIGFILENAME, true, true), "UTF-8" ))
+    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false, eu ) )
     {
-      writer.write("<?xml version=\"1.0\"?>\n");
-      writer.write("<team id=\"" + (teamid==null?"":teamid) + "\">\n");
-      saveNode( rootteamnode, writer, 1 );
-      writer.write("</team>\n");
+      compositefile.initA();
+      compositefile.initB();    
+      try (OutputStreamWriter writer = new OutputStreamWriter( compositefile.getEncryptingOutputStream(TEAMCONFIGFILENAME, true, true), "UTF-8" ))
+      {
+        writer.write("<?xml version=\"1.0\"?>\n");
+        writer.write("<team id=\"" + (teamid==null?"":teamid) + "\">\n");
+        saveNode( rootteamnode, writer, 1 );
+        writer.write("</team>\n");
+      }
     }
   }
   
@@ -252,14 +275,10 @@ public class TeamKeyStore extends CompositeFileKeyStore
     writer.write("</node>\n");
   }
   
-  void addNode( PGPPublicKey parentkey, PGPPublicKey key, boolean controller )
+  TeamNode addNode( TeamNode parent, PGPPublicKey key, boolean controller )
   {
     if ( waitingtoload )
       loadTree();
-    
-    TeamNode parent = null;
-    if ( parentkey != null )
-      parent = nodesbyid.get(parentkey.getKeyID());
     
     TeamNode teamnode = new TeamNode();
     teamnode.role = (parent==null)?(TeamNode.ROLE_ROOT | TeamNode.ROLE_CONTROLLER):TeamNode.ROLE_OTHER;
@@ -273,21 +292,33 @@ public class TeamKeyStore extends CompositeFileKeyStore
       parent.childnodes.add(teamnode);
     else
       rootteamnode = teamnode;
+    
+    return teamnode;
   }
   
-  class TeamNode
+  class TeamNode implements TreeNode
   {
     final static int ROLE_ROOT = 2;
     final static int ROLE_CONTROLLER = 1;
     final static int ROLE_OTHER = 0;
     
-    int role;
+    private int role;
     long keyid;
     PGPPublicKey publickey;
+    TeamNode parent;
     long parentkeyid;
     boolean signedparent;
     
+    String name=null;
+    
     final ArrayList<TeamNode> childnodes = new ArrayList<>();
+
+    public String toString()
+    {
+      if ( name == null )
+        name = publickey.getUserIDs().next() + " " + Long.toUnsignedString(keyid, 16);
+      return name;
+    }
     
     public boolean isRoot()
     {
@@ -298,11 +329,118 @@ public class TeamKeyStore extends CompositeFileKeyStore
     {
       return (role & ROLE_CONTROLLER) != 0;
     }
+
+    @Override
+    public TreeNode getChildAt(int childIndex)
+    {
+      return childnodes.get( childIndex );
+    }
+
+    @Override
+    public int getChildCount()
+    {
+      return childnodes.size();
+    }
+
+    @Override
+    public TreeNode getParent()
+    {
+      return parent;
+    }
+
+    @Override
+    public int getIndex(TreeNode node)
+    {
+      for ( int i=0; i<childnodes.size(); i++ )
+      {
+        if ( childnodes.get(i) == node )
+          return i;
+      }
+      return -1;
+    }
+
+    @Override
+    public boolean getAllowsChildren()
+    {
+      return (role & ROLE_CONTROLLER) != 0;
+    }
+
+    @Override
+    public boolean isLeaf()
+    {
+      return !getAllowsChildren();
+    }
+
+    @Override
+    public Enumeration children()
+    {
+      return Collections.enumeration(childnodes);
+    }
+  }
+
+  class TeamModel implements TreeModel
+  {
+    ArrayList<TreeModelListener> listeners = new ArrayList<>();
+    
+    
+    @Override
+    public Object getRoot()
+    {
+      return rootteamnode;
+    }
+
+    @Override
+    public Object getChild(Object parent, int index)
+    {
+      TeamNode parentnode = (TeamNode)parent;
+      return parentnode.getChildAt(index);
+    }
+
+    @Override
+    public int getChildCount(Object parent)
+    {
+      TeamNode parentnode = (TeamNode)parent;
+      return parentnode.getChildCount();
+    }
+
+    @Override
+    public boolean isLeaf(Object node)
+    {
+      TeamNode parentnode = (TeamNode)node;
+      return parentnode.isLeaf();
+    }
+
+    @Override
+    public void valueForPathChanged(TreePath path, Object newValue)
+    {
+      
+    }
+
+    @Override
+    public int getIndexOfChild(Object parent, Object child)
+    {
+      TeamNode parentnode = (TeamNode)parent;
+      TeamNode childnode = (TeamNode)child;
+      return parentnode.getIndex(childnode);
+    }
+
+    @Override
+    public void addTreeModelListener(TreeModelListener l)
+    {
+      listeners.add(l);
+    }
+
+    @Override
+    public void removeTreeModelListener(TreeModelListener l)
+    {
+      listeners.remove(l);
+    }
+    
   }
   
   class TeamTreeParser extends DefaultHandler
   {
-    Stack<PGPPublicKey> stack = new Stack<>();
+    Stack<TeamNode> stack = new Stack<>();
     
     
     @Override
@@ -325,11 +463,11 @@ public class TeamKeyStore extends CompositeFileKeyStore
       long keyid = Long.parseUnsignedLong(strkeyid, 16);
       PGPPublicKeyRing keyring = getPublicKeyRing( keyid );
       PGPPublicKey key = keyring.getPublicKey( keyid );
-      PGPPublicKey parentkey = null;
+      TeamNode parent = null;
       if ( !stack.empty() )
-        parentkey = stack.peek();
-      addNode( parentkey, key, (role & TeamNode.ROLE_CONTROLLER) != 0 );
-      stack.push(key);
+        parent = stack.peek();
+      TeamNode node = addNode( parent, key, (role & TeamNode.ROLE_CONTROLLER) != 0 );
+      stack.push( node );
       // ready for children to start too
     }
 

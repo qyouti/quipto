@@ -123,16 +123,15 @@ public class EncryptedCompositeFile
     ignoresignatures = true;
   }
 
-  public void initA() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public void initA() throws IOException
   {
     try
     {
       initAPrivate();
     }
-    catch ( Exception e )
+    catch ( NoSuchAlgorithmException | NoSuchProviderException e )
     {
-      super.close();
-      throw e;
+      throw new IOException( "Cryptography problem.", e );
     }
   }
   
@@ -180,7 +179,7 @@ public class EncryptedCompositeFile
   }
 
   
-  public void initB() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public void initB()
   {
     ignoresignatures = false;
   }
@@ -713,11 +712,9 @@ public class EncryptedCompositeFile
 
   /**
    * Close the composite file when access to entries in it is no longer needed.
-   * @throws IOException 
    */
   @Override
   public void close()
-          throws IOException
   {
     super.close();
   }

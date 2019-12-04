@@ -72,7 +72,6 @@ public class WriteEncryptedTar
       CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile, personaleu );
       CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, alias, alias );
       personalkeyfinder.init();
-      personalkeystore.initB();
       
       TeamTrust teamtrust = new TeamTrust( alias, personalkeystore, personalkeyfinder, teamkeystorefile );      
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );

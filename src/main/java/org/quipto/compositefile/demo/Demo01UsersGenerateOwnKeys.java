@@ -77,7 +77,6 @@ public class Demo01UsersGenerateOwnKeys
     if ( eu != null )
     {
       CompositeFileKeyStore keystore = new CompositeFileKeyStore( file, eu );
-      keystore.initB();
       return keystore;
     }
     return null;

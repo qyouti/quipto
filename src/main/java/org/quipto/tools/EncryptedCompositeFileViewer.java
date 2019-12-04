@@ -439,7 +439,6 @@ public class EncryptedCompositeFileViewer
       CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile, personaleu );
       CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, alias, alias );
       personalkeyfinder.init();
-      personalkeystore.initB();
 
       teamtrust = new TeamTrust( alias, personalkeystore, personalkeyfinder, teamkeystorefile );
       euser = new EncryptedCompositeFileUser( teamtrust, teamtrust );

@@ -48,7 +48,6 @@ public class SignKeys
       CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile, personaleu );
       CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, signeralias, signeralias );
       personalkeyfinder.init();
-      personalkeystore.initB();
       
       TeamTrust teamtrust = new TeamTrust( signeralias, personalkeystore, personalkeyfinder, teamkeystorefile );
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );

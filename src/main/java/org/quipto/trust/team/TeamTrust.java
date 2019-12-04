@@ -14,6 +14,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.tree.TreeModel;
 import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPPrivateKey;
 import org.bouncycastle.openpgp.PGPPublicKey;
@@ -65,12 +66,15 @@ public class TeamTrust implements TrustContext, KeyFinder
     teamkeystore = new TeamKeyStore( teamkeystorefile, eu );
     teamkeyfinder = new CompositeFileKeyFinder( teamkeystore, alias, alias );
     teamkeyfinder.init();
-    teamkeystore.initB();
-        
 
     updatePersonallyTrusted();
   }
 
+  public TreeModel getTreeModel()
+  {
+    return teamkeystore.getTreeModel();
+  }
+  
   public void close()
   {
     teamkeystore.close();
@@ -330,5 +334,9 @@ public class TeamTrust implements TrustContext, KeyFinder
       return pubkey;
     return personalkeyfinder.findFirstPublicKey(userid);
   }
-  
+ 
+  public List<PGPPublicKeyRing> getAllTeamPublicKeyRings()
+  {
+    return teamkeystore.getAllPublicKeyRings();
+  }
 }

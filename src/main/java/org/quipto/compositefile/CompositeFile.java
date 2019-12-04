@@ -25,6 +25,8 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileLock;
 import java.util.HashMap;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarConstants;
@@ -36,14 +38,14 @@ import org.apache.commons.compress.archivers.tar.TarConstants;
  * closed. Builds on Apache Commons.
  * @author maber01
  */
-public class CompositeFile
+public class CompositeFile implements AutoCloseable
 {
     static byte[] zeroblock = new byte[512];
     
     private final String canonical;
     private final File file;
     private final RandomAccessFile raf;
-    private final FileLock lock;
+    private FileLock lock;
     private boolean newlycreated;
     private boolean open = false;
     private InputStream currentinputstream = null;
@@ -71,16 +73,39 @@ public class CompositeFile
         boolean exists = file.exists();
         if ( !exists && !create )
           throw new IOException( "File " + canonical + " does not exist." );
+        
         raf = new RandomAccessFile( file, "rwd" );
-        // now the file will exist - if 'exists == true' it will be empty
-        lock = raf.getChannel().lock();
-        if ( !exists )
+        try
         {
-            raf.write( zeroblock );
-            raf.write( zeroblock );
-            raf.seek(0);
-            newlycreated = true;
+          // if the file didn't exist, it will now and will be empty
+          long start = System.currentTimeMillis();
+          long now;
+          lock = null;
+          do
+          {
+            lock = raf.getChannel().tryLock();
+            if ( lock == null )
+              try { Thread.sleep(1000); } catch ( InterruptedException intex ) {}
+            now = System.currentTimeMillis();
+          }
+          while ( lock == null && (now-start)<10000 );
+          if ( lock == null )
+            throw new IOException( "Unable to obtain a lock on file " + canonical );
+          
+          if ( !exists )
+          {
+              raf.write( zeroblock );
+              raf.write( zeroblock );
+              raf.seek(0);
+              newlycreated = true;
+          }
         }
+        catch ( Exception e )
+        {
+          try {raf.close();} catch (Throwable t) {}
+          throw e;
+        }
+        
         open = true;
         readComponentMap();
     }
@@ -103,15 +128,29 @@ public class CompositeFile
      * 
      * @throws IOException 
      */
-    public void close() throws IOException
+    public void close()
     {
         synchronized ( this )
         {
           if ( open )
           {
             open = false;
-            lock.release();
-            raf.close();
+            try
+            {
+              lock.release();
+            }
+            catch (Throwable ex)
+            {
+              Logger.getLogger(CompositeFile.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            try
+            {
+              raf.close();
+            }
+            catch (Throwable ex)
+            {
+              Logger.getLogger(CompositeFile.class.getName()).log(Level.SEVERE, null, ex);
+            }
           }
         }
     }
