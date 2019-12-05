@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreeNode;
@@ -256,6 +257,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
         writer.write("</team>\n");
       }
     }
+    teammodel.fireTreeStructureChanged();
   }
   
   void saveNode( TeamNode node, Writer writer, int depth ) throws IOException
@@ -436,6 +438,15 @@ public class TeamKeyStore extends CompositeFileKeyStore
       listeners.remove(l);
     }
     
+    public void fireTreeStructureChanged()
+    {
+      TreeModelEvent e;
+      TreeNode[] nodepath = new TreeNode[1];
+      nodepath[0] = rootteamnode;
+      e = new TreeModelEvent( this, nodepath );
+      for ( TreeModelListener l : listeners )
+        l.treeStructureChanged(e);
+    }
   }
   
   class TeamTreeParser extends DefaultHandler

@@ -70,6 +70,11 @@ public class TeamTrust implements TrustContext, KeyFinder
     updatePersonallyTrusted();
   }
 
+  public boolean isController()
+  {
+    return teamkeystore.isController( eu.getKeyFinder().getSecretKeyForSigning().getKeyID() );
+  }
+  
   public TreeModel getTreeModel()
   {
     return teamkeystore.getTreeModel();
@@ -104,6 +109,8 @@ public class TeamTrust implements TrustContext, KeyFinder
   
   public void addPublicKeyToTeamStore( PGPPublicKey parentkey, PGPPublicKey publickey, boolean controller ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
+    if ( !isController() )
+      throw new IOException( "Attempt to edit team store with a key that lacks controller access." );
     ArrayList<PGPPublicKey> list = new ArrayList<>();
     list.add(publickey);
     teamkeystore.addAccessToPublicKey(publickey);
