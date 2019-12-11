@@ -126,8 +126,8 @@ public class WindowsPasswordHandler implements EncryptedCompositeFilePasswordHan
       }
       else
       {
-        System.out.println("Serial number = " + serial.toString(16) );
-        System.out.println("As long = " + Long.toHexString( serial.longValue() ) );        
+        //System.out.println("Serial number = " + serial.toString(16) );
+        //System.out.println("As long = " + Long.toHexString( serial.longValue() ) );        
       }
 
       return true;
@@ -207,7 +207,7 @@ public class WindowsPasswordHandler implements EncryptedCompositeFilePasswordHan
       Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
       cipher.init( Cipher.DECRYPT_MODE, prikey );
       byte[] decrypt = cipher.doFinal( encrypted );
-      System.out.println( "Password is: " + new String( decrypt, "UTF8" ) );
+      //System.out.println( "Password is: " + new String( decrypt, "UTF8" ) );
       return new String( decrypt, "UTF8" ).toCharArray();
     }
     catch ( UnsupportedEncodingException | InvalidKeyException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException | NoSuchPaddingException e )

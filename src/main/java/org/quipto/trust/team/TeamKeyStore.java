@@ -60,7 +60,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
           throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
     super( file, eu );
-    System.out.println( "CONSTRUCTED TeamKeyStore" );
+    //System.out.println( "CONSTRUCTED TeamKeyStore" );
   }
 
   public TreeModel getTreeModel()
@@ -212,7 +212,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
   
   public void loadTree()
   {
-    System.out.println( "LOADING TREE" );
+    //System.out.println( "LOADING TREE" );
     waitingtoload = false;
     try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false, eu ) )
     {
@@ -318,7 +318,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
     public String toString()
     {
       if ( name == null )
-        name = publickey.getUserIDs().next() + " " + Long.toUnsignedString(keyid, 16);
+        name = publickey.getUserIDs().next(); // + " " + Long.toUnsignedString(keyid, 16);
       return name;
     }
     

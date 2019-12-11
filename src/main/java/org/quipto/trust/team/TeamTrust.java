@@ -172,10 +172,10 @@ public class TeamTrust implements TrustContext, KeyFinder
       return ex.getReport();
     }
     
-    System.out.println( "Team trust chain...");
-    for ( PGPPublicKey key : trustkeylist )
-      System.out.println( "ID: " + Long.toHexString( key.getKeyID() ) + " First UserID " + getUserID( key ) );
-    System.out.println( "...End of Team Trust chain");
+//    System.out.println( "Team trust chain...");
+//    for ( PGPPublicKey key : trustkeylist )
+//      System.out.println( "ID: " + Long.toHexString( key.getKeyID() ) + " First UserID " + getUserID( key ) );
+//    System.out.println( "...End of Team Trust chain");
     
     int personallysignedpublickey=-1;
     for ( int i=0; i<trustkeylist.length; i++ )
@@ -187,8 +187,8 @@ public class TeamTrust implements TrustContext, KeyFinder
         break;
       }
     }
-    if ( personallysignedpublickey >= 0 )
-      System.out.println( "Found in personal key store: " + Long.toHexString( trustkeylist[personallysignedpublickey].getKeyID() ) );
+    //if ( personallysignedpublickey >= 0 )
+    //  System.out.println( "Found in personal key store: " + Long.toHexString( trustkeylist[personallysignedpublickey].getKeyID() ) );
     return checkTrustChainPublicKeys( trustkeylist, personallysignedpublickey );
   }
   
@@ -272,8 +272,8 @@ public class TeamTrust implements TrustContext, KeyFinder
   
   private TrustContextReport checkKeySignature( PGPPublicKey signed, PGPPublicKey signer )
   {
-    System.out.print( " Checking ID: " + Long.toHexString( signed.getKeyID() ) + ", " + getUserID( signed ) );
-    System.out.println( " signed by " + Long.toHexString( signer.getKeyID() ) + ", " + getUserID( signer ) );
+    //System.out.print( " Checking ID: " + Long.toHexString( signed.getKeyID() ) + ", " + getUserID( signed ) );
+    //System.out.println( " signed by " + Long.toHexString( signer.getKeyID() ) + ", " + getUserID( signer ) );
     
     return new TrustContextReport( true, null );
   }

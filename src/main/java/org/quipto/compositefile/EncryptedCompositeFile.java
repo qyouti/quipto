@@ -564,7 +564,7 @@ public class EncryptedCompositeFile
       if ( !(o instanceof PGPOnePassSignatureList) )
         return 0L;
       
-      System.out.println( "File was signed." );
+      //System.out.println( "File was signed." );
       PGPOnePassSignatureList onepasssiglist = (PGPOnePassSignatureList)o;
       if ( onepasssiglist.size() != 1 )
         throw new IOException( "Invalid Signature Format in data file." );
@@ -606,7 +606,7 @@ public class EncryptedCompositeFile
    */
   private  synchronized InputStream getDecryptingInputStream( String name, boolean permission ) throws IOException
   {
-    System.out.println( "Reading " + name );
+    //System.out.println( "Reading " + name );
     try
     {
       initPassphraseForThisCompositeFile();
@@ -670,7 +670,7 @@ public class EncryptedCompositeFile
       {
         if ( !ignoresignatures )
         {
-          System.out.println( "File " + name + " was signed." );
+          //System.out.println( "File " + name + " was signed." );
           inputwrapper.onepasssiglist = (PGPOnePassSignatureList)o;
           inputwrapper.onepasssignature = inputwrapper.onepasssiglist.get(0);
           long signerkeyid = inputwrapper.onepasssignature.getKeyID();
@@ -998,7 +998,7 @@ public class EncryptedCompositeFile
             System.out.println("message failed integrity check");
           } else
           {
-            System.out.println("message integrity check passed");
+            //System.out.println("message integrity check passed");
           }
         } catch (PGPException ex)
         {
@@ -1006,7 +1006,7 @@ public class EncryptedCompositeFile
         }
       } else
       {
-        System.out.println("no message integrity check");
+        //System.out.println("no message integrity check");
       }
       closeInputStream();
       literalin.close();
@@ -1014,18 +1014,18 @@ public class EncryptedCompositeFile
       if ( !ignoresignatures && onepasssignature != null )
       {
         Object o = pgpobjectfactory.nextObject();
-        System.out.println( "\n\nObject class following literal data object." + o.getClass().toString() );
+        //System.out.println( "\n\nObject class following literal data object." + o.getClass().toString() );
         if ( o instanceof PGPSignatureList )
         {
           PGPSignatureList siglist = (PGPSignatureList)o;
           if ( siglist.size() != 1 )
             throw new IOException( "Problem attempting to verify the digital signature on this data file." );
           PGPSignature signature = siglist.get(0);
-          System.out.println( "Verifying " + sigcount + " bytes of data" );
+          //System.out.println( "Verifying " + sigcount + " bytes of data" );
           try
           {
             boolean verified = onepasssignature.verify(signature);
-            System.out.println( "Signature verification " + verified );
+            //System.out.println( "Signature verification " + verified );
           }
           catch (PGPException ex)
           {
@@ -1131,7 +1131,7 @@ public class EncryptedCompositeFile
       // generate the signature packet and append it to stream.
       if ( siggen != null )
       {
-        System.out.println( "Signing " + sigcount + " bytes of data." );
+        //System.out.println( "Signing " + sigcount + " bytes of data." );
         try {
           siggen.generate().encode(compressingoutput);          
         }
