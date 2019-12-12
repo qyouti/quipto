@@ -29,6 +29,7 @@ import org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator;
 import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.compositefile.WrongPasswordException;
 
 /**
  *
@@ -53,22 +54,37 @@ public class CompositeFileKeyStore
   HashMap<Long,PGPSecretKeyRing> secrettable = new HashMap<>();
   
   
-  public CompositeFileKeyStore( File file, EncryptedCompositeFileUser eu ) throws IOException
+  public CompositeFileKeyStore( File file ) throws IOException
   {
     this.file = file;
     this.eu = eu;
-    openAndLoadAll();
   }
 
-  private void openAndLoadAll() throws IOException
+  public String getCustomPassphraseType() throws IOException
   {
-    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false, eu ) )
+    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false ) )
     {
-      compositefile.initA();
+      return compositefile.getCustomPassphraseType();
+    }
+    catch ( IOException ex)
+    {
+      Logger.getLogger(CompositeFileKeyStore.class.getName()).log(Level.SEVERE, null, ex);
+      throw ex;
+    }
+  }
+  
+  public void setUser( EncryptedCompositeFileUser eu ) throws IOException, WrongPasswordException
+  {
+    this.eu = eu;
+    openAndLoadAll();
+  }
+  
+  private void openAndLoadAll() throws IOException, WrongPasswordException
+  {
+    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false ) )
+    {
       index = new Properties();
-      if ( compositefile.exists(INDEXFILENAME) )
-        loadIndices(compositefile);
-      compositefile.initB();    
+      compositefile.setUser( eu );    
       if ( compositefile.exists(INDEXFILENAME) )
         loadIndices(compositefile);
       
@@ -79,6 +95,10 @@ public class CompositeFileKeyStore
     {
       Logger.getLogger(CompositeFileKeyStore.class.getName()).log(Level.SEVERE, null, ex);
       throw ex;
+    }
+    catch (NoSuchProviderException | NoSuchAlgorithmException ex)
+    {
+      Logger.getLogger(CompositeFileKeyStore.class.getName()).log(Level.SEVERE, null, ex);
     }
     
   }
@@ -167,12 +187,11 @@ public class CompositeFileKeyStore
     }    
   }
 
-  public void addAccessToPublicKey( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public void addAccessToPublicKey( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
   {
-    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false, eu ) )
+    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false ) )
     {
-      compositefile.initA();
-      compositefile.initB();    
+      compositefile.setUser( eu );    
       compositefile.addPublicKey(publickey);
     }
   }
@@ -257,7 +276,7 @@ public class CompositeFileKeyStore
     return keyid;
   }
   
-  public void setPublicKeyRing( PGPPublicKeyRing keyring ) throws IOException
+  public void setPublicKeyRing( PGPPublicKeyRing keyring ) throws IOException, WrongPasswordException
   {
     PGPPublicKey key = CompositeFileKeyStore.getMasterPublicKey(keyring);
     if ( key == null )
@@ -312,7 +331,7 @@ public class CompositeFileKeyStore
     storePublicKeyRing( mergedpublickeyring, masterkeyid );
   }
 
-  public void setSecretKeyRing( PGPSecretKeyRing keyring ) throws IOException
+  public void setSecretKeyRing( PGPSecretKeyRing keyring ) throws IOException, WrongPasswordException
   {
     PGPSecretKey key = CompositeFileKeyStore.getMasterSecretKey(keyring);
     if ( key == null )
@@ -323,14 +342,13 @@ public class CompositeFileKeyStore
   }
 
   
-  private void storePublicKeyRing( PGPPublicKeyRing mergedpublickeyring, long masterkeyid ) throws IOException
+  private void storePublicKeyRing( PGPPublicKeyRing mergedpublickeyring, long masterkeyid ) throws IOException, WrongPasswordException
   {
     String strkeyid = Long.toHexString( masterkeyid );
     String filename = getPublicKeyFilename( masterkeyid );
-    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false, eu ) )
+    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false ) )
     {
-      compositefile.initA();
-      compositefile.initB();    
+      compositefile.setUser( eu );
       try ( OutputStream out = compositefile.getEncryptingOutputStream(filename, true, false) )
       {
         mergedpublickeyring.encode(out);
@@ -342,17 +360,21 @@ public class CompositeFileKeyStore
 
       indexPublicUserIDs( compositefile, mergedpublickeyring, strkeyid );
       publictable.put( masterkeyid, mergedpublickeyring );
+    }
+    catch (NoSuchProviderException | NoSuchAlgorithmException ex)
+    {
+      Logger.getLogger(CompositeFileKeyStore.class.getName()).log(Level.SEVERE, null, ex);
+      throw new IOException( ex );
     }    
   }
   
-  private void storeSecretKeyRing( PGPSecretKeyRing keyring, long masterkeyid ) throws IOException
+  private void storeSecretKeyRing( PGPSecretKeyRing keyring, long masterkeyid ) throws IOException, WrongPasswordException
   {
     String strkeyid = Long.toHexString( masterkeyid );
     String filename = getSecretKeyFilename( masterkeyid );
-    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false, eu ) )
+    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false ) )
     {
-      compositefile.initA();
-      compositefile.initB();    
+      compositefile.setUser( eu );
       try ( OutputStream out = compositefile.getEncryptingOutputStream(filename, true, false) )
       {
         keyring.encode(out);
@@ -365,6 +387,11 @@ public class CompositeFileKeyStore
 
       indexSecretUserIDs( compositefile, keyring, strkeyid );
       secrettable.put( masterkeyid, keyring );
+    }
+    catch (NoSuchProviderException | NoSuchAlgorithmException ex)
+    {
+      Logger.getLogger(CompositeFileKeyStore.class.getName()).log(Level.SEVERE, null, ex);
+      throw new IOException( ex );
     }    
   }
     

@@ -22,6 +22,7 @@ import org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator;
 import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator;
 import org.quipto.compositefile.EncryptedCompositeFilePasswordHandler;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.compositefile.WrongPasswordException;
 import org.quipto.key.impl.CompositeFileKeyFinder;
 import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.key.impl.StandardRSAKeyBuilderSigner;
@@ -35,7 +36,7 @@ public class SignKeys
 {
   private static final KeyFingerPrintCalculator fingerprintcalc = new BcKeyFingerprintCalculator();
   
-  public static void signKeysAndImport( String signeralias, EncryptedCompositeFilePasswordHandler passhandler, boolean initteam, String[] subjectaliases, boolean[] addtoteam, boolean[] controller, boolean[] isparent )
+  public static void signKeysAndImport( String signeralias, EncryptedCompositeFilePasswordHandler passhandler, boolean initteam, String[] subjectaliases, boolean[] addtoteam, boolean[] controller, boolean[] isparent ) throws WrongPasswordException
   {
     Security.addProvider(new BouncyCastleProvider());
     
@@ -45,7 +46,8 @@ public class SignKeys
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
           
       EncryptedCompositeFileUser personaleu = new EncryptedCompositeFileUser( passhandler );
-      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile, personaleu );
+      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile );
+      personalkeystore.setUser(personaleu);
       CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, signeralias, signeralias );
       personalkeyfinder.init();
       

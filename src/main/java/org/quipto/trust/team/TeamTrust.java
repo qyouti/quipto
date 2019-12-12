@@ -24,6 +24,7 @@ import org.bouncycastle.openpgp.PGPSignature;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFilePasswordHandler;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.compositefile.WrongPasswordException;
 import org.quipto.key.KeyFinder;
 import org.quipto.key.KeyFinderException;
 import org.quipto.key.impl.CompositeFileKeyFinder;
@@ -55,7 +56,7 @@ public class TeamTrust implements TrustContext, KeyFinder
           CompositeFileKeyStore personalkeystore,
           CompositeFileKeyFinder personalkeyfinder, 
           File teamkeystorefile
-  ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, PGPException
+  ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, PGPException, WrongPasswordException
   {
     this.personalkeystore = personalkeystore;
     this.personalkeyfinder = personalkeyfinder;
@@ -97,7 +98,7 @@ public class TeamTrust implements TrustContext, KeyFinder
     }    
   }
   
-  public void addRootPublicKeyToTeamStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public void addRootPublicKeyToTeamStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
   {
     ArrayList<PGPPublicKey> list = new ArrayList<>();
     list.add(publickey);
@@ -107,7 +108,7 @@ public class TeamTrust implements TrustContext, KeyFinder
     updatePersonallyTrusted();
   }
   
-  public void addPublicKeyToTeamStore( PGPPublicKey parentkey, PGPPublicKey publickey, boolean controller ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public void addPublicKeyToTeamStore( PGPPublicKey parentkey, PGPPublicKey publickey, boolean controller ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
   {
     if ( !isController() )
       throw new IOException( "Attempt to edit team store with a key that lacks controller access." );
@@ -119,7 +120,7 @@ public class TeamTrust implements TrustContext, KeyFinder
     updatePersonallyTrusted();
   }
   
-  public void addParentCertificationToTeamStore( PGPPublicKey parentkey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public void addParentCertificationToTeamStore( PGPPublicKey parentkey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
   {
     ArrayList<PGPPublicKey> list = new ArrayList<>();
     list.add(parentkey);
@@ -132,7 +133,7 @@ public class TeamTrust implements TrustContext, KeyFinder
     teamkeystore.dumpTeam();
   }  
   
-  public void addPublicKeyToPersonalStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+  public void addPublicKeyToPersonalStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
   {
     ArrayList<PGPPublicKey> list = new ArrayList<>();
     list.add(publickey);

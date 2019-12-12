@@ -33,6 +33,7 @@ import org.bouncycastle.openpgp.operator.jcajce.JcePGPDataEncryptorBuilder;
 import org.bouncycastle.util.Arrays;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFilePasswordHandler;
+import org.quipto.compositefile.WrongPasswordException;
 
 /**
  *
@@ -67,7 +68,7 @@ public class PasswordPasswordHandler implements EncryptedCompositeFilePasswordHa
   }
   
   @Override
-  public char[] decryptPassword(byte[] cipher, Properties properties)
+  public char[] decryptPassword(byte[] cipher, Properties properties) throws WrongPasswordException
   {
     ByteArrayInputStream bain = new ByteArrayInputStream( cipher );
     
@@ -107,9 +108,11 @@ public class PasswordPasswordHandler implements EncryptedCompositeFilePasswordHa
       literalin.close();
       clearin.close();
       return new String( baout.toByteArray(), "UTF-8" ).toCharArray();
-    } catch (PGPException ex)
+    }
+    catch (PGPException ex)
     {
       Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
+      throw new WrongPasswordException();
     }
     catch (IOException ex)
     {

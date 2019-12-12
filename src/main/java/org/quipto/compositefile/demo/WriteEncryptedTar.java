@@ -30,6 +30,7 @@ import org.bouncycastle.openpgp.PGPPublicKey;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFilePasswordHandler;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.compositefile.WrongPasswordException;
 import org.quipto.key.impl.CompositeFileKeyFinder;
 import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.trust.team.TeamTrust;
@@ -69,15 +70,15 @@ public class WriteEncryptedTar
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
       
       EncryptedCompositeFileUser personaleu = new EncryptedCompositeFileUser( passhandler );
-      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile, personaleu );
+      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile );
+      personalkeystore.setUser( personaleu );
       CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, alias, alias );
       personalkeyfinder.init();
       
       TeamTrust teamtrust = new TeamTrust( alias, personalkeystore, personalkeyfinder, teamkeystorefile );      
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
-      EncryptedCompositeFile compfile = new EncryptedCompositeFile( file, !file.exists(), true, eu );
-      compfile.initA();      
-      compfile.initB();
+      EncryptedCompositeFile compfile = new EncryptedCompositeFile( file, !file.exists(), true );
+      compfile.setUser( eu );
       
       for ( int i=0; i<addalias.length; i++ )
       {
@@ -109,7 +110,7 @@ public class WriteEncryptedTar
       }
       compfile.close();
     }
-    catch (IOException | PGPException | NoSuchProviderException | NoSuchAlgorithmException ex)
+    catch (IOException | PGPException | NoSuchProviderException | NoSuchAlgorithmException | WrongPasswordException ex)
     {
       Logger.getLogger(WriteEncryptedTar.class.getName()).log(Level.SEVERE, null, ex);
     }

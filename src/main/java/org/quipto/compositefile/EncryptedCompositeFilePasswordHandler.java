@@ -25,7 +25,7 @@ public interface EncryptedCompositeFilePasswordHandler
    * @param properties
    * @return Either the decrypted password or null to indicate that this is the wrong kind of handler
    */
-  public char[] decryptPassword( byte[] cipher, Properties properties );
+  public char[] decryptPassword( byte[] cipher, Properties properties ) throws WrongPasswordException;
   
   /**
    * Asks handler to encrypt using its own properties

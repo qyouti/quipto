@@ -33,6 +33,7 @@ import org.bouncycastle.openpgp.PGPSecretKeyRing;
 import org.quipto.QuiptoStandards;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.compositefile.WrongPasswordException;
 import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.key.impl.StandardRSAKeyBuilderSigner;
 import org.quipto.passwords.PasswordPasswordHandler;
@@ -49,7 +50,7 @@ public class Demo01UsersGenerateOwnKeys
 
   //CompositeFileKeyStore[] keyringfile = new CompositeFileKeyStore[aliases.length];
   
-  private CompositeFileKeyStore createKeyRing( String alias ) throws IOException, PGPException, NoSuchProviderException, NoSuchAlgorithmException
+  private CompositeFileKeyStore createKeyRing( String alias ) throws IOException, PGPException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
   {
     File dir, file;
     
@@ -76,13 +77,14 @@ public class Demo01UsersGenerateOwnKeys
       eu = new EncryptedCompositeFileUser( new PasswordPasswordHandler( alias + "@thingy.com", alias.toCharArray() ) );
     if ( eu != null )
     {
-      CompositeFileKeyStore keystore = new CompositeFileKeyStore( file, eu );
+      CompositeFileKeyStore keystore = new CompositeFileKeyStore( file );
+      keystore.setUser(eu);
       return keystore;
     }
     return null;
   }
   
-  private void storePublicKey( boolean andexport, String alias, CompositeFileKeyStore keystore, PGPPublicKey key ) throws IOException, PGPException
+  private void storePublicKey( boolean andexport, String alias, CompositeFileKeyStore keystore, PGPPublicKey key ) throws IOException, PGPException, WrongPasswordException
   {
     if ( keystore == null )
       return;
@@ -104,7 +106,7 @@ public class Demo01UsersGenerateOwnKeys
     }
   }
 
-  private void storeSecretKey( String alias, CompositeFileKeyStore keystore, PGPSecretKey key ) throws IOException, PGPException
+  private void storeSecretKey( String alias, CompositeFileKeyStore keystore, PGPSecretKey key ) throws IOException, PGPException, WrongPasswordException
   {
     if ( keystore == null )
       return;

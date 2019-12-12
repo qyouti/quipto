@@ -8,7 +8,6 @@ package org.quipto.trust.team;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.security.NoSuchAlgorithmException;
@@ -34,6 +33,7 @@ import org.bouncycastle.openpgp.PGPPublicKeyRing;
 import org.quipto.QuiptoStandards;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.compositefile.WrongPasswordException;
 import org.quipto.key.impl.CompositeFileKeyStore;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
@@ -57,9 +57,10 @@ public class TeamKeyStore extends CompositeFileKeyStore
   TeamModel teammodel = new TeamModel();
   
   public TeamKeyStore( File file, EncryptedCompositeFileUser eu )
-          throws IOException, NoSuchProviderException, NoSuchAlgorithmException
+          throws IOException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
   {
-    super( file, eu );
+    super( file );
+    super.setUser(eu);
     //System.out.println( "CONSTRUCTED TeamKeyStore" );
   }
 
@@ -76,7 +77,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
   }
   
   
-  public void setRootKey( PGPPublicKey key ) throws IOException
+  public void setRootKey( PGPPublicKey key ) throws IOException, WrongPasswordException
   {
     if ( waitingtoload )
       loadTree();
@@ -85,7 +86,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
     saveTree();
   }
   
-  public void addKey( PGPPublicKey parentkey, PGPPublicKey key, boolean controller ) throws IOException
+  public void addKey( PGPPublicKey parentkey, PGPPublicKey key, boolean controller ) throws IOException, WrongPasswordException
   {
     if ( waitingtoload )
       loadTree();
@@ -214,10 +215,9 @@ public class TeamKeyStore extends CompositeFileKeyStore
   {
     //System.out.println( "LOADING TREE" );
     waitingtoload = false;
-    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false, eu ) )
+    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false ) )
     {
-      compositefile.initA();
-      compositefile.initB();    
+      compositefile.setUser( eu );
       teamid=null;
       rootteamnode=null;
       
@@ -235,7 +235,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
       }
       
     }
-    catch (ParserConfigurationException | SAXException | IOException ex)
+    catch (ParserConfigurationException | SAXException | IOException | NoSuchProviderException | NoSuchAlgorithmException | WrongPasswordException ex )
     {
       rootteamnode=null;
       Logger.getLogger(TeamKeyStore.class.getName()).log(Level.SEVERE, null, ex);
@@ -243,12 +243,11 @@ public class TeamKeyStore extends CompositeFileKeyStore
   }
   
   
-  void saveTree() throws IOException
+  void saveTree() throws IOException, WrongPasswordException
   {
-    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false, eu ) )
+    try ( EncryptedCompositeFile compositefile = new EncryptedCompositeFile( file, true, false ) )
     {
-      compositefile.initA();
-      compositefile.initB();    
+      compositefile.setUser( eu );
       try (OutputStreamWriter writer = new OutputStreamWriter( compositefile.getEncryptingOutputStream(TEAMCONFIGFILENAME, true, true), "UTF-8" ))
       {
         writer.write("<?xml version=\"1.0\"?>\n");
@@ -256,6 +255,11 @@ public class TeamKeyStore extends CompositeFileKeyStore
         saveNode( rootteamnode, writer, 1 );
         writer.write("</team>\n");
       }
+    }
+    catch (NoSuchProviderException | NoSuchAlgorithmException ex)
+    {
+      Logger.getLogger(TeamKeyStore.class.getName()).log(Level.SEVERE, null, ex);
+      throw new IOException( ex );
     }
     teammodel.fireTreeStructureChanged();
   }

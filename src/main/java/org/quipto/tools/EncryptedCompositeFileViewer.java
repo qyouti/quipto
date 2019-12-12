@@ -311,9 +311,8 @@ public class EncryptedCompositeFileViewer
       if ( compfile != null )
         compfile.close();
       datastorelabel.setText(file.getAbsolutePath());
-      compfile = new EncryptedCompositeFile( file, false, true, euser );
-      compfile.initA();
-      compfile.initB();
+      compfile = new EncryptedCompositeFile( file, false, true );
+      compfile.setUser( euser );
 
       listmodel.clear();
       for ( String name : compfile.getComponentNames() )
@@ -436,7 +435,8 @@ public class EncryptedCompositeFileViewer
     try
     {
       EncryptedCompositeFileUser personaleu = new EncryptedCompositeFileUser( personalkeystorepasshandler );
-      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile, personaleu );
+      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile );
+      personalkeystore.setUser( personaleu );
       CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, alias, alias );
       personalkeyfinder.init();
 

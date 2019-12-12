@@ -28,6 +28,7 @@ import org.bouncycastle.openpgp.PGPException;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFilePasswordHandler;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
+import org.quipto.compositefile.WrongPasswordException;
 import org.quipto.key.impl.CompositeFileKeyFinder;
 import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.trust.team.TeamTrust;
@@ -58,15 +59,15 @@ public class ReadEncryptedTar
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
       
       EncryptedCompositeFileUser personaleu = new EncryptedCompositeFileUser( passhandler );
-      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile, personaleu );
+      CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile );
+      personalkeystore.setUser(personaleu);
       CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, alias, alias );
       personalkeyfinder.init();
       
       TeamTrust teamtrust = new TeamTrust( alias, personalkeystore, personalkeyfinder, teamkeystorefile );
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
-      EncryptedCompositeFile compfile = new EncryptedCompositeFile(file, false, true, eu);
-      compfile.initA();
-      compfile.initB();
+      EncryptedCompositeFile compfile = new EncryptedCompositeFile(file, false, true);
+      compfile.setUser( eu );
       compfile.addPublicKey( teamtrust.getSecretKeyForDecryption().getPublicKey() );
       
       for ( String entryname : entrynames )
@@ -99,6 +100,10 @@ public class ReadEncryptedTar
       Logger.getLogger(ReadEncryptedTar.class.getName()).log(Level.SEVERE, null, ex);
     }
     catch (NoSuchAlgorithmException ex)
+    {
+      Logger.getLogger(ReadEncryptedTar.class.getName()).log(Level.SEVERE, null, ex);
+    }
+    catch (WrongPasswordException ex)
     {
       Logger.getLogger(ReadEncryptedTar.class.getName()).log(Level.SEVERE, null, ex);
     }

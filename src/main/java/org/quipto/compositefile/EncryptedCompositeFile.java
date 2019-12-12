@@ -65,6 +65,8 @@ import org.bouncycastle.openpgp.operator.jcajce.JcePublicKeyKeyEncryptionMethodG
 import org.bouncycastle.util.io.Streams;
 import org.quipto.QuiptoStandards;
 import org.quipto.key.KeyFinder;
+import org.quipto.passwords.PasswordPasswordHandler;
+import org.quipto.passwords.WindowsPasswordHandler;
 import org.quipto.trust.TrustContextException;
 import org.quipto.trust.TrustContextReport;
 
@@ -96,7 +98,7 @@ public class EncryptedCompositeFile
   
   int type;
   boolean accesscontrol;
-  EncryptedCompositeFileUser eu;
+  EncryptedCompositeFileUser eu=null;
 
   Properties custompassphraseproperties = null;
   
@@ -114,17 +116,12 @@ public class EncryptedCompositeFile
    * @param eu
    * @throws IOException 
    */
-  public EncryptedCompositeFile( File file, boolean create, boolean accesscontrol, EncryptedCompositeFileUser eu )
+  public EncryptedCompositeFile( File file, boolean create, boolean accesscontrol )
           throws IOException
   {
     super(file, create);
-    this.eu = eu;
     this.accesscontrol = accesscontrol;
     ignoresignatures = true;
-  }
-
-  public void initA() throws IOException
-  {
     try
     {
       initAPrivate();
@@ -134,10 +131,34 @@ public class EncryptedCompositeFile
       throw new IOException( "Cryptography problem.", e );
     }
   }
-  
+
   private void initAPrivate() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    if ( isNewlyCreated() )
+    if ( !isNewlyCreated() )
+    {
+      String propsname = getCustomPassphraseFileName()+".properties";
+      if ( exists(propsname) )
+      {
+        try ( InputStream in = super.getInputStream( propsname ) )
+        {
+          custompassphraseproperties = new Properties();
+          custompassphraseproperties.loadFromXML(in);
+        }
+        catch ( IOException ioex )
+        {
+          custompassphraseproperties = null;
+          throw ioex;
+        }
+      }
+    }
+  }
+
+  
+  public void setUser( EncryptedCompositeFileUser eu ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
+  {
+    this.eu = eu;
+    initPassphraseForThisCompositeFile();
+    if ( !exists( getConfigurationFileName() ) )
     {
       // add user's own password with appropriate encryption
       if ( eu.isExclusive() )
@@ -154,34 +175,23 @@ public class EncryptedCompositeFile
     }
     else
     {
-      String propsname = getCustomPassphraseFileName()+".properties";
-      if ( exists(propsname) )
-      {
-        try ( InputStream in = super.getInputStream( propsname ) )
-        {
-          custompassphraseproperties = new Properties();
-          custompassphraseproperties.loadFromXML(in);
-        }
-        catch ( IOException ioex )
-        {
-          custompassphraseproperties = null;
-          throw ioex;
-        }
-      }
-      
       type = getConfiguration();    
       if ( type == TYPE_EXCLUSIVE )
       {
         if ( custompassphraseproperties == null )
           throw new IOException( "Archive should be exclusive access but lacks a passphrase properties entry." );
       }
+      if ( eu.isExclusive() != (type == TYPE_EXCLUSIVE) )
+        throw new IOException( "File exclusivity doesn't match the requested exclusivity." );
+      if ( eu.getPasswordHandler() instanceof WindowsPasswordHandler && !"windowspasswordhandler".equals(getCustomPassphraseType()) )
+        throw new IOException( "File expects windows protection." );
+      if ( eu.getPasswordHandler() instanceof PasswordPasswordHandler && !"passwordpasswordhandler".equals(getCustomPassphraseType()) )
+        throw new IOException( "File expects password." );        
     }
-  }
-
-  
-  public void initB()
-  {
+    // until this point signatures were ignored
+    // now they are checked.
     ignoresignatures = false;
+    initPassphraseForThisCompositeFile();
   }
 
   public String getCustomPassphraseType()
@@ -337,7 +347,7 @@ public class EncryptedCompositeFile
    * @throws NoSuchProviderException 
    */
   private void initPassphraseForThisCompositeFile()
-          throws IOException, NoSuchProviderException
+          throws IOException, NoSuchProviderException, WrongPasswordException
   {
     int passphrasestatus = eu.getPassPhraseStatus( getCanonicalPath() );
     char[] passphrase=null;
@@ -432,14 +442,6 @@ public class EncryptedCompositeFile
     KeyFinder keyfinder = eu.getKeyFinder();
     if ( keyfinder == null && sign )
       throw new IOException("Can't sign an entry in a composite file if the user doesn't specify OpenPGP keys.");
-    try
-    {
-      initPassphraseForThisCompositeFile();
-    }
-    catch (NoSuchProviderException ex)
-    {
-      throw new IOException("Unable to determine password to use.",ex);
-    }
     if ( eu.getPassPhraseStatus(getCanonicalPath()) != PASS_KNOWN )
       throw new IOException("Unable to initialise encrypted output because there are no recipients added.");
     char[] passphrase = eu.getPassPhrase(getCanonicalPath());
@@ -606,15 +608,6 @@ public class EncryptedCompositeFile
    */
   private  synchronized InputStream getDecryptingInputStream( String name, boolean permission ) throws IOException
   {
-    //System.out.println( "Reading " + name );
-    try
-    {
-      initPassphraseForThisCompositeFile();
-    }
-    catch (NoSuchProviderException ex)
-    {
-      throw new IOException("Unable to determine password to use.",ex);
-    }
     if ( eu.getPassPhraseStatus(getCanonicalPath()) != PASS_KNOWN )
       throw new IOException("The file is encrypted but not for the key that was just presented.");
     char[] passphrase = eu.getPassPhrase(getCanonicalPath());
@@ -891,7 +884,6 @@ public class EncryptedCompositeFile
    */
   private void addPublicKeyPrivately(PGPPublicKey key) throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    initPassphraseForThisCompositeFile();
     int passphrasestatus = eu.getPassPhraseStatus( getCanonicalPath() );
     if (passphrasestatus == PASS_HIDDEN)
     {
@@ -920,7 +912,6 @@ public class EncryptedCompositeFile
    */
   private void addCustomUser() throws IOException, NoSuchProviderException, NoSuchAlgorithmException
   {
-    initPassphraseForThisCompositeFile();
     int passphrasestatus = eu.getPassPhraseStatus( getCanonicalPath() );
     if (passphrasestatus == PASS_HIDDEN)
     {
