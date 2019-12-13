@@ -46,7 +46,7 @@ public class ReadEncryptedTar
    * @param passhandler
    * @param entrynames
    */
-  public static void readEncryptedTar( String alias, EncryptedCompositeFilePasswordHandler passhandler, String[] entrynames )
+  public static void readEncryptedTar( DemoUtils.DemoUser user, EncryptedCompositeFilePasswordHandler passhandler, String[] entrynames )
   {
     Security.addProvider(new BouncyCastleProvider());
     
@@ -55,16 +55,16 @@ public class ReadEncryptedTar
       int x, i;
       InputStream in;
       File file = new File("demo/shared/mydataenc.tar");
-      File personalkeystorefile = new File("demo/" + alias + "home/keyring.tar");
+      File personalkeystorefile = new File( user.folder + "/keyring.tar");
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
       
       EncryptedCompositeFileUser personaleu = new EncryptedCompositeFileUser( passhandler );
       CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile );
       personalkeystore.setUser(personaleu);
-      CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, alias, alias );
+      CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, user.alias, user.alias );
       personalkeyfinder.init();
       
-      TeamTrust teamtrust = new TeamTrust( alias, personalkeystore, personalkeyfinder, teamkeystorefile );
+      TeamTrust teamtrust = new TeamTrust( user.alias, personalkeystore, personalkeyfinder, teamkeystorefile );
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
       EncryptedCompositeFile compfile = new EncryptedCompositeFile(file, false, true);
       compfile.setUser( eu );

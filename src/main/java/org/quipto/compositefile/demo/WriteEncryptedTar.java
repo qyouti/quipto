@@ -52,9 +52,9 @@ public class WriteEncryptedTar
    * @param big
    */
   public static void writeEncryptedTar( 
-          String alias, 
+          DemoUtils.DemoUser user, 
           EncryptedCompositeFilePasswordHandler passhandler, 
-          String[] addalias,
+          DemoUtils.DemoUser[] addusers,
           int[] addpermission,
           String[] entrynames, 
           boolean[] big )
@@ -66,23 +66,23 @@ public class WriteEncryptedTar
       int repeats;
       byte[] buffer;
       File file = new File("demo/shared/mydataenc.tar");
-      File personalkeystorefile = new File("demo/" + alias + "home/keyring.tar");
+      File personalkeystorefile = new File( user.folder + "/keyring.tar");
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
       
       EncryptedCompositeFileUser personaleu = new EncryptedCompositeFileUser( passhandler );
       CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile );
       personalkeystore.setUser( personaleu );
-      CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, alias, alias );
+      CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, user.alias, user.alias );
       personalkeyfinder.init();
       
-      TeamTrust teamtrust = new TeamTrust( alias, personalkeystore, personalkeyfinder, teamkeystorefile );      
+      TeamTrust teamtrust = new TeamTrust( user.alias, personalkeystore, personalkeyfinder, teamkeystorefile );      
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
       EncryptedCompositeFile compfile = new EncryptedCompositeFile( file, !file.exists(), true );
       compfile.setUser( eu );
       
-      for ( int i=0; i<addalias.length; i++ )
+      for ( int i=0; i<addusers.length; i++ )
       {
-        PGPPublicKey addkey = teamtrust.findFirstPublicKey( addalias[i] );
+        PGPPublicKey addkey = teamtrust.findFirstPublicKey( addusers[i].alias );
         if ( addkey != null )
         {
           compfile.addPublicKey( addkey );
@@ -108,6 +108,9 @@ public class WriteEncryptedTar
           out.write(buffer);
         out.close();
       }
+      
+      if ( compfile.isNFSPermissionSupported() )
+        compfile.setPermissionsOnFileSystem();
       compfile.close();
     }
     catch (IOException | PGPException | NoSuchProviderException | NoSuchAlgorithmException | WrongPasswordException ex)

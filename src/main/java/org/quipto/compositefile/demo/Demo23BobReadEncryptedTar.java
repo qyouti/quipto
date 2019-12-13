@@ -17,6 +17,7 @@ package org.quipto.compositefile.demo;
 
 import java.security.Security;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import static org.quipto.compositefile.demo.DemoUtils.BOB;
 import org.quipto.passwords.PasswordPasswordHandler;
 
 /**
@@ -33,8 +34,8 @@ public class Demo23BobReadEncryptedTar
   public static void main(String[] args)
   {
     Security.addProvider(new BouncyCastleProvider());    
-    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "bob@thingy.com", "bob".toCharArray() );
-    ReadEncryptedTar.readEncryptedTar( "bob", passhandler, filenames );
+    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( BOB.password );
+    ReadEncryptedTar.readEncryptedTar( BOB, passhandler, filenames );
   }
 
 }

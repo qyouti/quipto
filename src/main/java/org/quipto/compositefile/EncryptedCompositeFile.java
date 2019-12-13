@@ -22,15 +22,28 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.FileSystem;
+import java.nio.file.Files;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.UserPrincipal;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.bouncycastle.bcpg.CompressionAlgorithmTags;
 import org.bouncycastle.bcpg.HashAlgorithmTags;
 import org.bouncycastle.openpgp.PGPCompressedData;
@@ -94,6 +107,26 @@ public class EncryptedCompositeFile
   static final public int WRITE_PERMISSION_PERMISSION = 8;
   
   static final public int ALL_PERMISSIONS             = 0x0f;
+
+
+  static final Set<AclEntryPermission> NFSREADPERMISSIONS = EnumSet.of(
+            AclEntryPermission.READ_DATA, 
+            AclEntryPermission.READ_NAMED_ATTRS, 
+            AclEntryPermission.READ_ATTRIBUTES,
+            AclEntryPermission.READ_ACL,
+            AclEntryPermission.SYNCHRONIZE
+    );
+  static final Set<AclEntryPermission> NFSWRITEPERMISSIONS = EnumSet.of(
+            AclEntryPermission.WRITE_DATA, 
+            AclEntryPermission.APPEND_DATA, 
+            AclEntryPermission.WRITE_ATTRIBUTES,
+            AclEntryPermission.WRITE_NAMED_ATTRS
+    );
+  static final Set<AclEntryPermission> NFSACCESSPERMISSIONS = EnumSet.of(
+            AclEntryPermission.DELETE, 
+            AclEntryPermission.WRITE_ACL, 
+            AclEntryPermission.WRITE_OWNER
+    );
 
   
   int type;
@@ -319,6 +352,113 @@ public class EncryptedCompositeFile
     {
       throw e;
     }
+  }
+  
+  public boolean isNFSPermissionSupported() 
+  {
+    AclFileAttributeView view = Files.getFileAttributeView(file.toPath(), AclFileAttributeView.class);
+    return view != null;
+  }
+  
+  public void setPermissionsOnFileSystem() throws IOException
+  {
+    if ( type != EncryptedCompositeFile.TYPE_SHARED_AC )
+      return;
+    Set<String> permissionfiles = this.getComponentNames(".encryption/permissions/", false);
+    if ( permissionfiles.isEmpty() )
+      return;
+    
+    AclFileAttributeView view = Files.getFileAttributeView(file.toPath(), AclFileAttributeView.class);
+    if ( view == null )
+      throw new IOException("Unable to set file permissions on " + file.toString() + " because the file system does not support NFS standard access rights." );
+
+    Pattern patterntogetusername = Pattern.compile("\\((.*?)\\)");    
+    Pattern patterntogetdomain = Pattern.compile(".*<.*@([a-z,A-Z,0-9]*)\\.");    
+    Matcher matcher;
+
+    FileSystem filesystem = file.toPath().getFileSystem();
+    ArrayList<AclEntry> aclentrylist = new ArrayList<>();
+    AclEntry.Builder builder = AclEntry.newBuilder();
+    builder.setType(AclEntryType.ALLOW);
+    builder.setFlags(); 
+
+    HashSet<AclEntryPermission> nfspermissionset = new HashSet<>();
+    nfspermissionset.addAll( NFSREADPERMISSIONS );
+    nfspermissionset.addAll( NFSWRITEPERMISSIONS );
+    nfspermissionset.addAll( NFSACCESSPERMISSIONS );
+    AclEntry entry = makeAclEntry( filesystem, builder, "\\OWNER RIGHTS", nfspermissionset );
+    aclentrylist.add(entry);
+    for ( String filename : permissionfiles )
+    {
+      if ( !filename.endsWith( ".bin" ) )
+        continue;
+      int n = filename.lastIndexOf("/");
+      if ( n<0 ) continue;
+      String strkeyid = filename.substring( n+1, filename.length()-4 );
+      long keyid = Long.parseUnsignedLong(strkeyid, 16);
+      PGPPublicKey pubkey = eu.getKeyFinder().findPublicKey(keyid);
+      if ( pubkey == null )
+        // bail out - don't want to remove access just because key wasn't found
+        throw new IOException( "Unable to find public key for key id = " + keyid );
+
+      int pubkeypermissions = getPermission( pubkey );
+      nfspermissionset.clear();
+      if ( (pubkeypermissions & READ_PERMISSION) != 0 )
+        nfspermissionset.addAll( NFSREADPERMISSIONS );
+      if ( (pubkeypermissions & WRITE_PERMISSION) != 0 )
+        nfspermissionset.addAll( NFSWRITEPERMISSIONS );
+      if ( (pubkeypermissions & WRITE_PERMISSION_PERMISSION) != 0 )
+        nfspermissionset.addAll( NFSACCESSPERMISSIONS );
+
+      if ( nfspermissionset.isEmpty() )
+        continue;
+      
+      String alias = pubkey.getUserIDs().next();
+      matcher =patterntogetusername.matcher(alias);
+      if ( !matcher.find() )
+        throw new IOException( "Unable to find a computer user name in parentheses as part of the key name " + alias + " Prevented setting access rights on " +file.toString() );
+      String username = matcher.group(1);
+      matcher =patterntogetdomain.matcher(alias);
+      if ( !matcher.find() )
+        throw new IOException( "Unable to find an email domain name as part of the key name " + alias + " Prevented setting access rights on " +file.toString() );
+      String domain = matcher.group(1);
+      String nfsname = domain + "\\" + username;
+      entry = makeAclEntry( filesystem, builder, nfsname, nfspermissionset );
+      if ( entry == null )
+        throw new IOException( "Unable to find file system user " + nfsname + ". Prevented setting access rights on " +file.toString() );
+      aclentrylist.add(entry);
+    }
+    
+    System.out.println( "Dumping proposed ACL for: " + view.name() );
+    for ( AclEntry e : aclentrylist )
+      System.out.println( "ACL Entry: " + e.toString() );
+    System.out.println( "End of ACL " );    
+  }
+  
+  private AclEntry makeAclEntry( FileSystem filesystem, AclEntry.Builder builder, String nfsname, Set<AclEntryPermission> nfspermissions )
+  {
+    builder.setType(AclEntryType.ALLOW);
+    builder.setFlags(); 
+    builder.setPermissions( nfspermissions );
+    UserPrincipal principal=null;
+    try
+    {
+      // TODO get rid of hard-wired windows domain
+      // by looking at domain part of user email address
+      System.out.println( "Looking for " + nfsname );
+      principal = filesystem.getUserPrincipalLookupService().lookupPrincipalByName( nfsname );
+    }
+    catch ( Exception e )
+    {
+      System.out.println( "Not found." );
+      principal=null;
+    }
+    if ( principal != null )
+    {
+      builder.setPrincipal(principal);
+      return builder.build();
+    }    
+    return null;
   }
   
   private String getCustomPassphraseFileName()

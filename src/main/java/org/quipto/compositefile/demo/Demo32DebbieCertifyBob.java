@@ -18,6 +18,8 @@ package org.quipto.compositefile.demo;
 import java.security.Security;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import static org.quipto.compositefile.demo.DemoUtils.DEBBIE;
+import static org.quipto.compositefile.demo.DemoUtils.BOB;
 import org.quipto.passwords.PasswordPasswordHandler;
 
 /**
@@ -25,7 +27,7 @@ import org.quipto.passwords.PasswordPasswordHandler;
  */
 public class Demo32DebbieCertifyBob
 {
-  static final String[] subjectaliases = { "bob" };
+  static final DemoUtils.DemoUser[] subjectdemousers = { BOB };
   static final boolean[] addtoteam = { false };
   
   /**
@@ -38,7 +40,7 @@ public class Demo32DebbieCertifyBob
           throws Exception
   {
     Security.addProvider(new BouncyCastleProvider());
-    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "debbie@thingy.com", "debbie".toCharArray() );
-    SignKeys.signKeysAndImport("debbie", passhandler, false, subjectaliases, addtoteam, null, null );
+    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( DEBBIE.password );
+    SignKeys.signKeysAndImport(DEBBIE, passhandler, false, subjectdemousers, addtoteam, null, null );
   }
 }

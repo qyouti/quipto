@@ -14,6 +14,32 @@ import java.io.InputStream;
  */
 public class DemoUtils
 {
+  
+  // To test the use of file system access rights edit these aliases to match real
+  // users of the filesystem where demo files are created. Windows style users will
+  // be found by adding the user name from inside parentheses to the domain name
+  // from the email address.
+  
+  public static class DemoUser
+  {
+    public String alias;
+    public String folder;
+    public char[] password;
+    public DemoUser( String alias, String folder, String pass )
+    {
+      this.alias = alias;
+      this.folder = folder;
+      this.password = pass.toCharArray();
+    }
+  }
+  
+  public static final DemoUser ALICE = new DemoUser( "Alice (maber01) <alice@leedsbeckett.ac.uk>", "demo/home_of_alice", "alice" );
+  public static final DemoUser BOB = new DemoUser( "Bob (barrow01) <bob@leedsbeckett.ac.uk>", "demo/home_of_bob", "bob" );
+  public static final DemoUser CHARLIE = new DemoUser( "Charlie (croft01) <charlie@leedsbeckett.ac.uk>", "demo/home_of_charlie", "charlie" );
+  public static final DemoUser DEBBIE = new DemoUser( "Debbie (gilber11) <debbie@leedsbeckett.ac.uk>", "demo/home_of_debbie", "debbie" );
+    
+  
+  
   public static void dumpStream( InputStream in ) throws IOException
   {
     int x;

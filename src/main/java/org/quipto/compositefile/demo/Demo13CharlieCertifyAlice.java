@@ -18,6 +18,8 @@ package org.quipto.compositefile.demo;
 import java.security.Security;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import static org.quipto.compositefile.demo.DemoUtils.ALICE;
+import static org.quipto.compositefile.demo.DemoUtils.CHARLIE;
 import org.quipto.passwords.PasswordPasswordHandler;
 import org.quipto.passwords.WindowsPasswordHandler;
 
@@ -26,7 +28,7 @@ import org.quipto.passwords.WindowsPasswordHandler;
  */
 public class Demo13CharlieCertifyAlice
 {
-  static final String[] subjectaliases = { "alice" };
+  static final DemoUtils.DemoUser[] subjectdemousers = { ALICE };
   static final boolean[] addtoteam = { false };
   
   /**
@@ -40,6 +42,6 @@ public class Demo13CharlieCertifyAlice
   {
     Security.addProvider(new BouncyCastleProvider());
     WindowsPasswordHandler passhandler = new WindowsPasswordHandler();
-    SignKeys.signKeysAndImport("charlie", passhandler, false, subjectaliases, addtoteam, null, null );
+    SignKeys.signKeysAndImport(CHARLIE, passhandler, false, subjectdemousers, addtoteam, null, null );
   }
 }

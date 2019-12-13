@@ -18,6 +18,10 @@ package org.quipto.compositefile.demo;
 import java.security.Security;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.quipto.compositefile.EncryptedCompositeFile;
+import static org.quipto.compositefile.demo.DemoUtils.ALICE;
+import static org.quipto.compositefile.demo.DemoUtils.BOB;
+import static org.quipto.compositefile.demo.DemoUtils.CHARLIE;
+
 import org.quipto.passwords.PasswordPasswordHandler;
 
 /**
@@ -29,11 +33,7 @@ import org.quipto.passwords.PasswordPasswordHandler;
  */
 public class Demo21AliceMakeEncryptedTar
 {
-  static String[] addalias = 
-  {
-    "bob",
-    "charlie"
-  };
+  static final DemoUtils.DemoUser[] demousers = { BOB, CHARLIE };
   static int[] addpermission = 
   {
     EncryptedCompositeFile.ALL_PERMISSIONS,
@@ -47,8 +47,8 @@ public class Demo21AliceMakeEncryptedTar
   public static void main(String[] args)
   {
     Security.addProvider(new BouncyCastleProvider());
-    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( "alice@thingy.com", "alice".toCharArray() );
-    WriteEncryptedTar.writeEncryptedTar("alice", passhandler, addalias, addpermission, filenames, big);
+    PasswordPasswordHandler passhandler = new PasswordPasswordHandler( ALICE.password );
+    WriteEncryptedTar.writeEncryptedTar( ALICE, passhandler, demousers, addpermission, filenames, big);
   }
 
 }

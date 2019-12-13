@@ -18,6 +18,8 @@ package org.quipto.compositefile.demo;
 import java.security.KeyStoreException;
 import java.security.Security;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import static org.quipto.compositefile.demo.DemoUtils.CHARLIE;
+
 import org.quipto.passwords.WindowsPasswordHandler;
 
 /**
@@ -36,7 +38,7 @@ public class Demo24CharlieReadEncryptedTar
     Security.addProvider(new BouncyCastleProvider());
 
     WindowsPasswordHandler passhandler = new WindowsPasswordHandler();
-    ReadEncryptedTar.readEncryptedTar( "charlie", passhandler, filenames );
+    ReadEncryptedTar.readEncryptedTar( CHARLIE, passhandler, filenames );
   }
 
 }

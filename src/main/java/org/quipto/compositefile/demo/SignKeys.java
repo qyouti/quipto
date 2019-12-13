@@ -36,22 +36,29 @@ public class SignKeys
 {
   private static final KeyFingerPrintCalculator fingerprintcalc = new BcKeyFingerprintCalculator();
   
-  public static void signKeysAndImport( String signeralias, EncryptedCompositeFilePasswordHandler passhandler, boolean initteam, String[] subjectaliases, boolean[] addtoteam, boolean[] controller, boolean[] isparent ) throws WrongPasswordException
+  public static void signKeysAndImport( 
+          DemoUtils.DemoUser signerdemouser, 
+          EncryptedCompositeFilePasswordHandler passhandler, 
+          boolean initteam, 
+          DemoUtils.DemoUser[] subjectdemousers, 
+          boolean[] addtoteam, 
+          boolean[] controller, 
+          boolean[] isparent ) throws WrongPasswordException
   {
     Security.addProvider(new BouncyCastleProvider());
     
     try
     {
-      File personalkeystorefile = new File("demo/" + signeralias + "home/keyring.tar");
+      File personalkeystorefile = new File( signerdemouser.folder + "/keyring.tar");
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
           
       EncryptedCompositeFileUser personaleu = new EncryptedCompositeFileUser( passhandler );
       CompositeFileKeyStore personalkeystore = new CompositeFileKeyStore( personalkeystorefile );
       personalkeystore.setUser(personaleu);
-      CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, signeralias, signeralias );
+      CompositeFileKeyFinder personalkeyfinder = new CompositeFileKeyFinder( personalkeystore, signerdemouser.alias, signerdemouser.alias );
       personalkeyfinder.init();
       
-      TeamTrust teamtrust = new TeamTrust( signeralias, personalkeystore, personalkeyfinder, teamkeystorefile );
+      TeamTrust teamtrust = new TeamTrust( signerdemouser.alias, personalkeystore, personalkeyfinder, teamkeystorefile );
       EncryptedCompositeFileUser eu = new EncryptedCompositeFileUser( teamtrust, teamtrust );
       StandardRSAKeyBuilderSigner signer = new StandardRSAKeyBuilderSigner();
       
@@ -59,10 +66,10 @@ public class SignKeys
       if ( initteam )
         teamtrust.addRootPublicKeyToTeamStore( mypublickey );
       
-      for ( int i=0; i<subjectaliases.length; i++ )
+      for ( int i=0; i<subjectdemousers.length; i++ )
       {
-        String alias = subjectaliases[i];
-        File subjectkeyfile = new File( "demo/" + alias + "home/myselfsignedpublickey.gpg" );
+        DemoUtils.DemoUser user = subjectdemousers[i];
+        File subjectkeyfile = new File( user.folder + "/myselfsignedpublickey.gpg" );
         FileInputStream fin = new FileInputStream( subjectkeyfile );
         PGPPublicKeyRing keyring = new PGPPublicKeyRing( fin, fingerprintcalc );
         fin.close();

@@ -43,7 +43,6 @@ public class PasswordPasswordHandler implements EncryptedCompositeFilePasswordHa
 {
   
   Properties encryptionproperties;
-  String emailaddress;
   char[] masterpass;
   
   PrivateKey privatekey;
@@ -58,9 +57,8 @@ public class PasswordPasswordHandler implements EncryptedCompositeFilePasswordHa
    * 
    * @param name 
    */
-  public PasswordPasswordHandler(String emailaddress, char[] masterpass )
+  public PasswordPasswordHandler(char[] masterpass )
   {
-    this.emailaddress = emailaddress;
     this.masterpass = Arrays.copyOf( masterpass, masterpass.length );
     
     encryptionproperties = new Properties();

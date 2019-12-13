@@ -23,7 +23,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileLock;
+import java.util.AbstractSet;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -43,7 +46,7 @@ public class CompositeFile implements AutoCloseable
     static byte[] zeroblock = new byte[512];
     
     private final String canonical;
-    private final File file;
+    final File file;
     private final RandomAccessFile raf;
     private FileLock lock;
     private boolean newlycreated;
@@ -207,6 +210,20 @@ public class CompositeFile implements AutoCloseable
     public Set<String> getComponentNames()
     {
       return componentmap.keySet();
+    }
+    
+    public Set<String> getComponentNames( String base, boolean recurse )
+    {
+      if ( base.endsWith("/") )
+        base = base.substring(0, base.length() - 1 );
+      HashSet<String> set = new HashSet();
+      for ( String key : componentmap.keySet() )
+      {
+        if ( !key.startsWith( base ) ) continue;
+        if ( !recurse && key.substring( base.length()+1 ).contains( "/" ) ) continue;
+        set.add(key);
+      }
+      return set;
     }
     
     /**

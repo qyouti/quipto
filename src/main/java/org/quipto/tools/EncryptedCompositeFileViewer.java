@@ -266,7 +266,7 @@ public class EncryptedCompositeFileViewer
     try
     {
       if ( pass != null )
-        personalkeystorepasshandler = new PasswordPasswordHandler( alias, pass.toCharArray() );
+        personalkeystorepasshandler = new PasswordPasswordHandler( pass.toCharArray() );
       else
         personalkeystorepasshandler = new WindowsPasswordHandler();
       personalkeystorefile = file;

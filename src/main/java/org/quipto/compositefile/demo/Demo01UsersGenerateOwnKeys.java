@@ -34,6 +34,10 @@ import org.quipto.QuiptoStandards;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
 import org.quipto.compositefile.WrongPasswordException;
+import static org.quipto.compositefile.demo.DemoUtils.ALICE;
+import static org.quipto.compositefile.demo.DemoUtils.BOB;
+import static org.quipto.compositefile.demo.DemoUtils.CHARLIE;
+import static org.quipto.compositefile.demo.DemoUtils.DEBBIE;
 import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.key.impl.StandardRSAKeyBuilderSigner;
 import org.quipto.passwords.PasswordPasswordHandler;
@@ -46,22 +50,22 @@ import org.quipto.passwords.WindowsPasswordHandler;
  */
 public class Demo01UsersGenerateOwnKeys
 {
-  final String[] aliases = { "alice", "bob", "charlie", "debbie" };
+  final DemoUtils.DemoUser[] demousers = { ALICE, BOB, CHARLIE, DEBBIE };
 
   //CompositeFileKeyStore[] keyringfile = new CompositeFileKeyStore[aliases.length];
   
-  private CompositeFileKeyStore createKeyRing( String alias ) throws IOException, PGPException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
+  private CompositeFileKeyStore createKeyRing( DemoUtils.DemoUser demouser ) throws IOException, PGPException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
   {
     File dir, file;
     
     EncryptedCompositeFileUser eu;
-    dir = new File( "demo/" + alias + "home" );
+    dir = new File( demouser.folder );
     if ( !dir.exists() )
       dir.mkdir();
     file = new File( dir, "keyring.tar");
     if ( file.exists() )
       file.delete();
-    if ( "charlie".equals( alias) )
+    if ( demouser == CHARLIE )
     {
       try 
       {
@@ -74,7 +78,7 @@ public class Demo01UsersGenerateOwnKeys
       }
     }
     else
-      eu = new EncryptedCompositeFileUser( new PasswordPasswordHandler( alias + "@thingy.com", alias.toCharArray() ) );
+      eu = new EncryptedCompositeFileUser( new PasswordPasswordHandler( demouser.password ) );
     if ( eu != null )
     {
       CompositeFileKeyStore keystore = new CompositeFileKeyStore( file );
@@ -84,7 +88,7 @@ public class Demo01UsersGenerateOwnKeys
     return null;
   }
   
-  private void storePublicKey( boolean andexport, String alias, CompositeFileKeyStore keystore, PGPPublicKey key ) throws IOException, PGPException, WrongPasswordException
+  private void storePublicKey( boolean andexport, DemoUtils.DemoUser demouser, CompositeFileKeyStore keystore, PGPPublicKey key ) throws IOException, PGPException, WrongPasswordException
   {
     if ( keystore == null )
       return;
@@ -97,7 +101,7 @@ public class Demo01UsersGenerateOwnKeys
     // export
     if ( andexport )
     {
-      File file = new File( "demo/" + alias + "home/myselfsignedpublickey.gpg" );
+      File file = new File( demouser.folder + "/myselfsignedpublickey.gpg" );
       if ( file.exists() )
         file.delete();
       FileOutputStream fout = new FileOutputStream( file );
@@ -106,7 +110,7 @@ public class Demo01UsersGenerateOwnKeys
     }
   }
 
-  private void storeSecretKey( String alias, CompositeFileKeyStore keystore, PGPSecretKey key ) throws IOException, PGPException, WrongPasswordException
+  private void storeSecretKey( DemoUtils.DemoUser demouser, CompositeFileKeyStore keystore, PGPSecretKey key ) throws IOException, PGPException, WrongPasswordException
   {
     if ( keystore == null )
       return;
@@ -116,7 +120,7 @@ public class Demo01UsersGenerateOwnKeys
     PGPSecretKeyRing keyring = new PGPSecretKeyRing(keylist);
     keystore.setSecretKeyRing(keyring);
     
-    storePublicKey( true, alias, keystore, key.getPublicKey() );  
+    storePublicKey( true, demouser, keystore, key.getPublicKey() );  
   }
 
   private void run()
@@ -126,14 +130,14 @@ public class Demo01UsersGenerateOwnKeys
     
     StandardRSAKeyBuilderSigner keybuilder = new StandardRSAKeyBuilderSigner();    
     
-    for (String alias : aliases)
+    for (DemoUtils.DemoUser demouser : demousers)
     {
-      CompositeFileKeyStore keystore = createKeyRing(alias);
+      CompositeFileKeyStore keystore = createKeyRing( demouser );
       if (keystore != null)
       {
-        PGPSecretKey secretkey = keybuilder.buildSecretKey(alias, QuiptoStandards.SECRET_KEY_STANDARD_PASS);
+        PGPSecretKey secretkey = keybuilder.buildSecretKey(demouser.alias, QuiptoStandards.SECRET_KEY_STANDARD_PASS);
         if (secretkey != null)
-          storeSecretKey(alias, keystore, secretkey);
+          storeSecretKey(demouser, keystore, secretkey);
         keystore.close();
       }
     }
