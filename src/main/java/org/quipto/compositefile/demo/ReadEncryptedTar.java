@@ -39,6 +39,7 @@ import org.quipto.trust.team.TeamTrust;
  */
 public class ReadEncryptedTar
 {
+  public static String ARCHIVEFILENAME = "demo/shared/mydataenc.tar";
 
   /**
    * 
@@ -54,7 +55,7 @@ public class ReadEncryptedTar
     {
       int x, i;
       InputStream in;
-      File file = new File("demo/shared/mydataenc.tar");
+      File file = new File(ARCHIVEFILENAME);
       File personalkeystorefile = new File( user.folder + "/keyring.tar");
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
       

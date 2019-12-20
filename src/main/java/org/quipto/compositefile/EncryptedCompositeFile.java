@@ -315,13 +315,13 @@ public class EncryptedCompositeFile
       i = new Integer(0);
     }
     
-    try ( InputStream in = getDecryptingInputStream(name,true) )
-    {
-    }
-    catch (IOException ex)
-    {
-      Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
-    }
+//    try ( InputStream in = getDecryptingInputStream(name,true) )
+//    {
+//    }
+//    catch (IOException ex)
+//    {
+//      Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
+//    }
     
     permissiontable.put(name, i);
     return i.intValue();

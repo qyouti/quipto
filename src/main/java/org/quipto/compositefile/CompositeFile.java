@@ -18,6 +18,7 @@ package org.quipto.compositefile;
 
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -47,7 +48,8 @@ public class CompositeFile implements AutoCloseable
     
     private final String canonical;
     final File file;
-    private final RandomAccessFile raf;
+    private RandomAccessFile raf;
+    private boolean readonly=false;
     private FileLock lock;
     private boolean newlycreated;
     private boolean open = false;
@@ -61,10 +63,10 @@ public class CompositeFile implements AutoCloseable
     
     /**
      * Constructs a composite file based on the canonical path to
-     * a tar file and a File referring to it. If the tar doesn't
+     * a tar file and a File referring to it.If the tar doesn't
      * exist it will be created and then its contents are indexed.
      * 
-     * @param canonical The canonical path to the tar archive file.
+     * @param create
      * @param file The tar file.
      * @throws IOException 
      */
@@ -77,7 +79,20 @@ public class CompositeFile implements AutoCloseable
         if ( !exists && !create )
           throw new IOException( "File " + canonical + " does not exist." );
         
-        raf = new RandomAccessFile( file, "rwd" );
+        // Attempt read/write access first
+        try
+        {
+          raf = new RandomAccessFile( file, "rwd" );
+        }
+        catch ( FileNotFoundException fnfe )
+        {
+          if ( !exists && create )
+            throw new IOException( "Cannot create " + canonical + " Lacking write access to the file." );
+          readonly=true;
+          // try read only and this time don't catch the exception
+          raf = new RandomAccessFile( file, "r" );
+        }
+        
         try
         {
           // if the file didn't exist, it will now and will be empty
@@ -86,7 +101,8 @@ public class CompositeFile implements AutoCloseable
           lock = null;
           do
           {
-            lock = raf.getChannel().tryLock();
+            // if read only make a shared lock, if read/write an exclusive lock
+            lock = raf.getChannel().tryLock( 0L, Long.MAX_VALUE, readonly );
             if ( lock == null )
               try { Thread.sleep(1000); } catch ( InterruptedException intex ) {}
             now = System.currentTimeMillis();
@@ -268,6 +284,8 @@ public class CompositeFile implements AutoCloseable
      */
     public synchronized OutputStream getOutputStream( String name, boolean replace ) throws IOException
     {
+        if ( readonly )
+            throw new IOException( "No write access permission to composite file." );
         //System.out.println( "Looking for entry: " + name );
         if ( currentinputstream != null || currentoutputstream != null )
             throw new IOException( "Attempt to get data from composite file before previous operation has completed." );        

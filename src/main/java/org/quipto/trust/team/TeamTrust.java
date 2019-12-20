@@ -12,6 +12,7 @@ import java.security.NoSuchProviderException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.tree.TreeModel;
@@ -89,13 +90,24 @@ public class TeamTrust implements TrustContext, KeyFinder
   private void updatePersonallyTrusted()
   {
     // List all keys personally trusted
-    long[] personallytrusted = personalkeystore.getSignedKeyIds( ownsecretkeysigning.getKeyID() );
-    // Narrow to those that are controllers in the team store.
+    Set<Long> personallytrusted = personalkeystore.getSignedKeyIds( ownsecretkeysigning.getKeyID() );
+    
+    // Add ancestors of personally trusted keys from the trust tree to make a
+    // long list of trusted keys
+    ArrayList<Long> personallytrustedplusancestors = new ArrayList<Long>();
     for ( long keyid : personallytrusted )
+    {
+      PGPPublicKey[] a = teamkeystore.getTeamCertifiedAncestors(keyid,personallytrusted);
+      for ( PGPPublicKey k : a )
+        personallytrustedplusancestors.add( k.getKeyID() );
+    }
+    
+    // Narrow to those that are controllers in the team store.
+    for ( long keyid : personallytrustedplusancestors )
     {
       if ( teamkeystore.isController(keyid) && !personallytrustedteamkeyids.contains( keyid ) )
         personallytrustedteamkeyids.add(keyid);
-    }    
+    }
   }
   
   public void addRootPublicKeyToTeamStore( PGPPublicKey publickey ) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
@@ -196,9 +208,11 @@ public class TeamTrust implements TrustContext, KeyFinder
   private PGPPublicKey[] loadTrustChainPublicKeys( long signerkeyid )
           throws TrustContextException
   {
-    PGPPublicKey[] keys = teamkeystore.getTeamKeyChain(signerkeyid, personallytrustedteamkeyids );
+    //PGPPublicKey[] keys = teamkeystore.getTeamKeyChain(signerkeyid, personallytrustedteamkeyids );
+    PGPPublicKey[] keys = teamkeystore.getTeamKeyChain(signerkeyid, ownsecretkeysigning.getKeyID() );
+    
     if ( keys == null )
-      throw new TrustContextException( new TrustContextReport( false, "The key that signed the data file is not listed in the Trust file." ) );
+      throw new TrustContextException( new TrustContextReport( false, "The key that signed the data file cannot be verified. Unable to find a chain of trust between the signer and any of the keys you personally trust." ) );
     return keys;
     /*
     PGPPublicKey publickey;

@@ -37,6 +37,8 @@ public class DemoUtils
   public static final DemoUser BOB = new DemoUser( "Bob (barrow01) <bob@leedsbeckett.ac.uk>", "demo/home_of_bob", "bob" );
   public static final DemoUser CHARLIE = new DemoUser( "Charlie (croft01) <charlie@leedsbeckett.ac.uk>", "demo/home_of_charlie", "charlie" );
   public static final DemoUser DEBBIE = new DemoUser( "Debbie (gilber11) <debbie@leedsbeckett.ac.uk>", "demo/home_of_debbie", "debbie" );
+  public static final DemoUser EDWARD = new DemoUser( "Edward (caden01) <edward@leedsbeckett.ac.uk>", "demo/home_of_edward", "edward" );
+  public static final DemoUser FRED = new DemoUser( "Fred (mccann03) <fred@leedsbeckett.ac.uk>", "demo/home_of_fred", "fred" );
     
   
   

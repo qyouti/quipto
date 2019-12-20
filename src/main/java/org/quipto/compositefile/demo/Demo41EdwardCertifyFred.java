@@ -18,20 +18,19 @@ package org.quipto.compositefile.demo;
 import java.security.Security;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import static org.quipto.compositefile.demo.DemoUtils.ALICE;
-import static org.quipto.compositefile.demo.DemoUtils.BOB;
-import static org.quipto.compositefile.demo.DemoUtils.CHARLIE;
+import static org.quipto.compositefile.demo.DemoUtils.EDWARD;
+import static org.quipto.compositefile.demo.DemoUtils.FRED;
 import org.quipto.passwords.PasswordPasswordHandler;
 
 /**
  * One user certifies the keys of other users.
  */
-public class Demo11AliceCertifyBobCharlie
+public class Demo41EdwardCertifyFred
 {
-  static final DemoUtils.DemoUser[] subjectdemousers = { BOB, CHARLIE };
-  static final boolean[] addtoteam = { true, true };
-  static final boolean[] controller = { true, false };
-  static final boolean[] isparent = { false, false };
+  static final DemoUtils.DemoUser[] subjectdemousers = { FRED };
+  static final boolean[] addtoteam = { true };
+  static final boolean[] controller = { false };
+  static final boolean[] isparent = { false };
   
   /**
    * Run the demo.
@@ -43,7 +42,7 @@ public class Demo11AliceCertifyBobCharlie
           throws Exception
   {
     Security.addProvider(new BouncyCastleProvider());        
-    PasswordPasswordHandler passhandler = new PasswordPasswordHandler(  ALICE.password );
-    SignKeys.signKeysAndImport( ALICE, passhandler, true, subjectdemousers, addtoteam, controller, isparent );
+    PasswordPasswordHandler passhandler = new PasswordPasswordHandler(  EDWARD.password );
+    SignKeys.signKeysAndImport( EDWARD, passhandler, false, subjectdemousers, addtoteam, controller, isparent );
   }
 }

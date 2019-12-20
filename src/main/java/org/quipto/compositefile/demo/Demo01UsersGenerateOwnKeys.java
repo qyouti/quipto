@@ -38,6 +38,8 @@ import static org.quipto.compositefile.demo.DemoUtils.ALICE;
 import static org.quipto.compositefile.demo.DemoUtils.BOB;
 import static org.quipto.compositefile.demo.DemoUtils.CHARLIE;
 import static org.quipto.compositefile.demo.DemoUtils.DEBBIE;
+import static org.quipto.compositefile.demo.DemoUtils.EDWARD;
+import static org.quipto.compositefile.demo.DemoUtils.FRED;
 import org.quipto.key.impl.CompositeFileKeyStore;
 import org.quipto.key.impl.StandardRSAKeyBuilderSigner;
 import org.quipto.passwords.PasswordPasswordHandler;
@@ -50,7 +52,7 @@ import org.quipto.passwords.WindowsPasswordHandler;
  */
 public class Demo01UsersGenerateOwnKeys
 {
-  final DemoUtils.DemoUser[] demousers = { ALICE, BOB, CHARLIE, DEBBIE };
+  final DemoUtils.DemoUser[] demousers = { ALICE, BOB, CHARLIE, DEBBIE, EDWARD, FRED };
 
   //CompositeFileKeyStore[] keyringfile = new CompositeFileKeyStore[aliases.length];
   

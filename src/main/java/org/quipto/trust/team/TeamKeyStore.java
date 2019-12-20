@@ -16,7 +16,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -30,6 +32,7 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
+import org.bouncycastle.openpgp.PGPSignature;
 import org.quipto.QuiptoStandards;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
@@ -111,52 +114,110 @@ public class TeamKeyStore extends CompositeFileKeyStore
     return node.isController();
   }
   
-  public PGPPublicKey[] getTeamKeyChain( long keyid, List<Long> trustedkeyids )
+  public PGPPublicKey[] getTeamCertifiedAncestors( long keyid, Set<Long> personallytrusted )
   {
     if ( waitingtoload )
       loadTree();
-    ArrayList<List<PGPPublicKey>> candidates = new ArrayList<>();
-    for ( long tkeyid : trustedkeyids )
+    ArrayList<PGPPublicKey> list = new ArrayList<>();
+    TeamNode currentnode = nodesbyid.get(keyid);
+    TeamNode parentnode;
+    while ( currentnode != null )
     {
-      List<List<PGPPublicKey>> listolists = getTeamKeyChain( keyid, tkeyid );
-      if ( listolists != null )
-        candidates.addAll(listolists);
+      list.add( currentnode.publickey );
+      parentnode = currentnode.parent;
+      if ( currentnode.signedparent )
+        currentnode = parentnode;  // This team node signed its parent - continue to parent
+      else if ( parentnode != null && personallytrusted.contains(parentnode.keyid) )
+        currentnode = parentnode;  // Team parent node was personally signed by user
+      else
+        currentnode = null;        // trust ran out or we got to the root node
     }
+    return list.toArray( new PGPPublicKey[list.size()] );
+  }
+  
+//  public PGPPublicKey[] getTeamKeyChain( long keyid, List<Long> trustedkeyids )
+//  {
+//    if ( waitingtoload )
+//      loadTree();
+//    ArrayList<List<PGPPublicKey>> candidates = new ArrayList<>();
+//    for ( long tkeyid : trustedkeyids )
+//    {
+//      List<PGPPublicKey> listolists = getTeamKeyChain( keyid, tkeyid );
+//      if ( listolists != null )
+//        candidates.add(listolists);
+//    }
+//    
+//    if ( candidates.isEmpty() )
+//      return null;
+//    
+//    int best=0;
+//    for ( int i=0; i<candidates.size(); i++ )
+//      if ( candidates.get(i).size() < candidates.get(best).size() )
+//        best = i;
+//   
+//    List<PGPPublicKey> bestlist = candidates.get(best);
+//    return bestlist.toArray( new PGPPublicKey[bestlist.size()] );
+//  }
+
+  private Long getCommonAncestor( long keyida, long keyidb )
+  {
+    if ( waitingtoload )
+      loadTree();
     
-    if ( candidates.isEmpty() )
+    TeamNode currentnodea, currentnodeb;
+    currentnodea = nodesbyid.get( keyida );
+    currentnodeb = nodesbyid.get( keyidb );
+    if ( currentnodea == null || currentnodeb == null )
       return null;
     
-    int best=0;
-    for ( int i=0; i<candidates.size(); i++ )
-      if ( candidates.get(i).size() < candidates.get(best).size() )
-        best = i;
-   
-    List<PGPPublicKey> bestlist = candidates.get(best);
-    return bestlist.toArray( new PGPPublicKey[bestlist.size()] );
+    while ( currentnodea != currentnodeb )
+    {
+      if ( currentnodea.depth > currentnodeb.depth )
+        currentnodea = currentnodea.parent;
+      else if ( currentnodeb.depth > currentnodea.depth )
+        currentnodeb = currentnodeb.parent;
+      else
+      {
+        currentnodea = currentnodea.parent;
+        currentnodeb = currentnodeb.parent;        
+      }
+    }
+    
+    return currentnodea.keyid;
   }
-
+  
   /**
    * Find a line of trust from keyid to trustedkeyid
-   * @param keyid
-   * @param trustedkeyid
+   * @param signerkeyid
+   * @param ownkeyid
    * @return 
    */
-  private List<List<PGPPublicKey>> getTeamKeyChain( long keyid, long trustedkeyid )
+  public PGPPublicKey[] getTeamKeyChain( long signerkeyid, long ownkeyid )
   {
-    ArrayList<List<PGPPublicKey>> list = new ArrayList<>();
+    List<PGPPublicKey> uplist, downlist, list;
+    list = new ArrayList<PGPPublicKey>();
     
-    List<PGPPublicKey> uplist;
+    Long commonancestor = getCommonAncestor( signerkeyid, ownkeyid );
+    if ( commonancestor == null )
+      return new PGPPublicKey[0];
     
-    uplist= getTeamKeyChainPointToPoint( keyid, trustedkeyid );
+    uplist= getTeamKeyChainPointToPoint( signerkeyid, commonancestor );
     if ( uplist != null )
-      list.add(uplist);
+      list.addAll(uplist);
+
+    if ( commonancestor != ownkeyid )
+    {
+      downlist= getTeamKeyChainPointToPoint( ownkeyid, commonancestor );
+      if ( downlist == null )
+        return new PGPPublicKey[0];
+      // list up instead of down
+      Collections.reverse(downlist);
+      // remove duplicate of commonancestor
+      downlist.remove(0);
+      list.addAll(downlist);
+    }
     
-    uplist= getTeamKeyChainPointToPoint( trustedkeyid, keyid );
-    if ( uplist != null )
-      list.add(uplist);
-    
-    
-    return list;
+    return list.toArray( new PGPPublicKey[list.size()] );
   }
   
   private List<PGPPublicKey> getTeamKeyChainPointToPoint( long keyida, long keyidb )
@@ -291,7 +352,23 @@ public class TeamKeyStore extends CompositeFileKeyStore
     if ( controller ) teamnode.role |= TeamNode.ROLE_CONTROLLER;
     teamnode.keyid = key.getKeyID();
     teamnode.publickey = key;
+    teamnode.parent = parent;
     teamnode.parentkeyid = (parent==null)?key.getKeyID():parent.keyid;
+    teamnode.depth = (parent==null)?0:parent.depth+1;
+    teamnode.signedparent = false;
+    if ( parent != null )
+    {
+      Iterator<PGPSignature> sigit = parent.publickey.getSignaturesForKeyID( teamnode.keyid );
+      while ( sigit.hasNext() )
+      {
+        PGPSignature sig = sigit.next();
+        if ( true )  // TODO validate the signature
+        {
+          teamnode.signedparent = true;
+          break;
+        }
+      }
+    }
     
     nodesbyid.put(teamnode.keyid, teamnode);
     if ( parent != null )
@@ -308,6 +385,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
     final static int ROLE_CONTROLLER = 1;
     final static int ROLE_OTHER = 0;
     
+    int depth;
     private int role;
     long keyid;
     PGPPublicKey publickey;

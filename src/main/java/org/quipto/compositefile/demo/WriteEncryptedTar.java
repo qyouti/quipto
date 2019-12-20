@@ -42,6 +42,8 @@ import org.quipto.trust.team.TeamTrust;
 public class WriteEncryptedTar
 {
 
+  public static String ARCHIVEFILENAME = "demo/shared/mydataenc.tar";
+  
   /**
    * 
    * @param alias
@@ -65,7 +67,7 @@ public class WriteEncryptedTar
     {
       int repeats;
       byte[] buffer;
-      File file = new File("demo/shared/mydataenc.tar");
+      File file = new File( ARCHIVEFILENAME );
       File personalkeystorefile = new File( user.folder + "/keyring.tar");
       File teamkeystorefile = new File( "demo/shared/teamkeyring.tar" );
       

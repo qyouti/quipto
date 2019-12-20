@@ -14,9 +14,11 @@ import java.security.NoSuchProviderException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bouncycastle.openpgp.PGPException;
@@ -263,17 +265,17 @@ public class CompositeFileKeyStore
    * @param signerkeyid
    * @return 
    */
-  public long[] getSignedKeyIds( long signerkeyid )
+  public Set<Long> getSignedKeyIds( long signerkeyid )
   {
+    HashSet<Long> set = new HashSet<>();
     String strsignerkeyid = Long.toHexString( signerkeyid );
     String currentvalue = index.getProperty("signer_" + strsignerkeyid);
     if ( currentvalue == null || currentvalue == "" )
-      return new long[0];
+      return set;
     String[] strkeyid = currentvalue.split(",");
-    long[] keyid = new long[strkeyid.length];
     for ( int i=0; i<strkeyid.length; i++ )
-      keyid[i] = Long.parseUnsignedLong(strkeyid[i], 16);
-    return keyid;
+      set.add( Long.parseUnsignedLong(strkeyid[i], 16) );
+    return set;
   }
   
   public void setPublicKeyRing( PGPPublicKeyRing keyring ) throws IOException, WrongPasswordException
