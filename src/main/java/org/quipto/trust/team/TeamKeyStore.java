@@ -30,14 +30,20 @@ import javax.swing.tree.TreePath;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
+import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
 import org.bouncycastle.openpgp.PGPSignature;
+import org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider;
+import org.bouncycastle.util.Arrays;
 import org.quipto.QuiptoStandards;
 import org.quipto.compositefile.EncryptedCompositeFile;
 import org.quipto.compositefile.EncryptedCompositeFileUser;
 import org.quipto.compositefile.WrongPasswordException;
+import org.quipto.key.KeyFinder;
 import org.quipto.key.impl.CompositeFileKeyStore;
+import org.quipto.trust.TrustContextException;
+import org.quipto.trust.TrustContextReport;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -55,15 +61,18 @@ public class TeamKeyStore extends CompositeFileKeyStore
   String teamid=null;
   TeamNode rootteamnode=null;
   boolean waitingtoload = true;
+  KeyFinder personalkeyfinder;
   final HashMap<Long,TeamNode> nodesbyid = new HashMap<>();
+  TeamNode nodeofuser = null;
   
   TeamModel teammodel = new TeamModel();
   
-  public TeamKeyStore( File file, EncryptedCompositeFileUser eu )
+  public TeamKeyStore( File file, EncryptedCompositeFileUser eu, KeyFinder personalkeyfinder )
           throws IOException, NoSuchProviderException, NoSuchAlgorithmException, WrongPasswordException
   {
     super( file );
     super.setUser(eu);
+    this.personalkeyfinder = personalkeyfinder;
     //System.out.println( "CONSTRUCTED TeamKeyStore" );
   }
 
@@ -114,26 +123,26 @@ public class TeamKeyStore extends CompositeFileKeyStore
     return node.isController();
   }
   
-  public PGPPublicKey[] getTeamCertifiedAncestors( long keyid, Set<Long> personallytrusted )
-  {
-    if ( waitingtoload )
-      loadTree();
-    ArrayList<PGPPublicKey> list = new ArrayList<>();
-    TeamNode currentnode = nodesbyid.get(keyid);
-    TeamNode parentnode;
-    while ( currentnode != null )
-    {
-      list.add( currentnode.publickey );
-      parentnode = currentnode.parent;
-      if ( currentnode.signedparent )
-        currentnode = parentnode;  // This team node signed its parent - continue to parent
-      else if ( parentnode != null && personallytrusted.contains(parentnode.keyid) )
-        currentnode = parentnode;  // Team parent node was personally signed by user
-      else
-        currentnode = null;        // trust ran out or we got to the root node
-    }
-    return list.toArray( new PGPPublicKey[list.size()] );
-  }
+//  public PGPPublicKey[] getTeamCertifiedAncestors( long keyid, Set<Long> personallytrusted )
+//  {
+//    if ( waitingtoload )
+//      loadTree();
+//    ArrayList<PGPPublicKey> list = new ArrayList<>();
+//    TeamNode currentnode = nodesbyid.get(keyid);
+//    TeamNode parentnode;
+//    while ( currentnode != null )
+//    {
+//      list.add( currentnode.publickey );
+//      parentnode = currentnode.parent;
+//      if ( currentnode.signedparent )
+//        currentnode = parentnode;  // This team node signed its parent - continue to parent
+//      else if ( parentnode != null && personallytrusted.contains(parentnode.keyid) )
+//        currentnode = parentnode;  // Team parent node was personally signed by user
+//      else
+//        currentnode = null;        // trust ran out or we got to the root node
+//    }
+//    return list.toArray( new PGPPublicKey[list.size()] );
+//  }
   
 //  public PGPPublicKey[] getTeamKeyChain( long keyid, List<Long> trustedkeyids )
 //  {
@@ -159,7 +168,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
 //    return bestlist.toArray( new PGPPublicKey[bestlist.size()] );
 //  }
 
-  private Long getCommonAncestor( long keyida, long keyidb )
+  private TeamNode getCommonAncestor( long keyida, long keyidb )
   {
     if ( waitingtoload )
       loadTree();
@@ -183,49 +192,128 @@ public class TeamKeyStore extends CompositeFileKeyStore
       }
     }
     
-    return currentnodea.keyid;
+    return currentnodea;
+  }
+
+  private void verifyKeySignature( SignatureStatus status )
+  {
+    try
+    {
+      status.sig.init( new BcPGPContentVerifierBuilderProvider(), status.signerkey );
+      //status.sig.update( status.signedkey.getEncoded() );
+      if ( status.sig.verifyCertification( status.signedkey ) )
+        status.report = new TrustContextReport( true, "Verified" );
+      else
+        status.report = new TrustContextReport( false, "Invalid signature" );
+    }
+    catch (PGPException ex)
+    {
+      Logger.getLogger(TeamKeyStore.class.getName()).log(Level.SEVERE, null, ex);
+      status.report = new TrustContextReport( false, "Technical fault attempting to verify signature." );
+    }
   }
   
+  private TrustContextReport verifySignature( TeamNode signednode, TeamNode signernode )
+  {
+    if ( signednode.signedpersonally.signed )
+    {
+      if ( signednode.signedpersonally.report == null )
+        verifyKeySignature( signednode.signedpersonally );
+      if ( signednode.signedpersonally.report.isTrusted() )
+        return signednode.signedpersonally.report;
+    }
+
+    if ( signednode.parent == signernode && signednode.signedbyparent.signed )
+    {
+      if ( signednode.signedbyparent.report == null )
+        verifyKeySignature( signednode.signedbyparent );
+      return signednode.signedbyparent.report;
+    }
+    
+    if ( signernode.parent == signednode && signernode.signedparent.signed )
+    {
+      if ( signernode.signedparent.report == null )
+        verifyKeySignature( signernode.signedparent );
+      return signernode.signedparent.report;
+    }
+    
+    return new TrustContextReport( false, "Unable to find appropriate signatures." );
+  }
+  
+ 
   /**
-   * Find a line of trust from keyid to trustedkeyid
+   * Find a line of trust from signerkeyid to ownkeyid
    * @param signerkeyid
-   * @param ownkeyid
+   * @param personalkeyfinder
    * @return 
    */
-  public PGPPublicKey[] getTeamKeyChain( long signerkeyid, long ownkeyid )
+  public TrustContextReport verifyTeamKeyChain( long signerkeyid )
   {
-    List<PGPPublicKey> uplist, downlist, list;
-    list = new ArrayList<PGPPublicKey>();
+    if ( waitingtoload )
+      loadTree();
     
-    Long commonancestor = getCommonAncestor( signerkeyid, ownkeyid );
+    List<TeamNode> uplist, downlist, list;
+    list = new ArrayList<>();
+    
+    if ( nodeofuser == null )
+      return new TrustContextReport( false, "Unable to find current user's public key in the team file." );
+    
+    TeamNode commonancestor = getCommonAncestor( signerkeyid, nodeofuser.keyid );
     if ( commonancestor == null )
-      return new PGPPublicKey[0];
+      return new TrustContextReport( false, "Unable to find team controller that trusts both the user signature and data signer." );
     
-    uplist= getTeamKeyChainPointToPoint( signerkeyid, commonancestor );
-    if ( uplist != null )
-      list.addAll(uplist);
+    uplist= getTeamKeyChainPointToPoint( signerkeyid, commonancestor.keyid );
+    if ( uplist == null || uplist.isEmpty() )
+      return new TrustContextReport( false, "Unable to find chain of trust between data signer and a team controller signature." );
 
-    if ( commonancestor != ownkeyid )
+      
+    for ( int i=0; i<(uplist.size()-1); i++ )
     {
-      downlist= getTeamKeyChainPointToPoint( ownkeyid, commonancestor );
-      if ( downlist == null )
-        return new PGPPublicKey[0];
+      TeamNode node = uplist.get( i );
+      TeamNode parent = uplist.get( i+1 );
+      TrustContextReport report = verifySignature( node, parent );
+      if ( !report.isTrusted() )
+        return report;
+    }
+    
+    list.addAll(uplist);
+
+    if ( commonancestor.keyid != nodeofuser.keyid )
+    {
+      downlist= getTeamKeyChainPointToPoint( nodeofuser.keyid, commonancestor.keyid );
+      if ( downlist == null || downlist.isEmpty() )
+        return new TrustContextReport( false, "Unable to find chain of trust between team controller signature data signer." );
+        
+      for ( int i=0; i<(downlist.size()-1); i++ )
+      {
+        TeamNode node = downlist.get( i );
+        TeamNode parent = downlist.get( i+1 );
+        TrustContextReport report = verifySignature( parent, node );
+        if ( !report.isTrusted() )
+          return report;
+      }
+
       // list up instead of down
       Collections.reverse(downlist);
       // remove duplicate of commonancestor
       downlist.remove(0);
       list.addAll(downlist);
     }
+
+    if ( list.isEmpty() )
+    {
+      return new TrustContextReport( false, "Unable to find chain of trust in the team file for the data." );
+    }
     
-    return list.toArray( new PGPPublicKey[list.size()] );
+    return new TrustContextReport( true, "Verified all signatures." );
   }
   
-  private List<PGPPublicKey> getTeamKeyChainPointToPoint( long keyida, long keyidb )
+  private List<TeamNode> getTeamKeyChainPointToPoint( long keyida, long keyidb )
   {
     if ( waitingtoload )
       loadTree();
     
-    ArrayList<PGPPublicKey> list = new ArrayList<>();
+    ArrayList<TeamNode> list = new ArrayList<>();
     long currentkeyid = keyida;
     TeamNode node;
     boolean foundtrust = false;
@@ -235,7 +323,7 @@ public class TeamKeyStore extends CompositeFileKeyStore
       if ( node == null ) return null;
       if ( currentkeyid == keyidb )
         foundtrust = true;
-      list.add(node.publickey);
+      list.add(node);
       currentkeyid = node.parentkeyid;
     }
     while ( !node.isRoot() && !foundtrust );
@@ -342,41 +430,75 @@ public class TeamKeyStore extends CompositeFileKeyStore
     writer.write("</node>\n");
   }
   
-  TeamNode addNode( TeamNode parent, PGPPublicKey key, boolean controller )
+  TeamNode addNode( TeamNode parentnode, PGPPublicKey key, boolean controller )
   {
-    if ( waitingtoload )
-      loadTree();
-    
+    Iterator<PGPSignature> sigit;
     TeamNode teamnode = new TeamNode();
-    teamnode.role = (parent==null)?(TeamNode.ROLE_ROOT | TeamNode.ROLE_CONTROLLER):TeamNode.ROLE_OTHER;
+    teamnode.role = (parentnode==null)?(TeamNode.ROLE_ROOT | TeamNode.ROLE_CONTROLLER):TeamNode.ROLE_OTHER;
     if ( controller ) teamnode.role |= TeamNode.ROLE_CONTROLLER;
     teamnode.keyid = key.getKeyID();
+    if ( personalkeyfinder.getSecretKeyForSigning().getKeyID() == teamnode.keyid )
+      nodeofuser = teamnode;
     teamnode.publickey = key;
-    teamnode.parent = parent;
-    teamnode.parentkeyid = (parent==null)?key.getKeyID():parent.keyid;
-    teamnode.depth = (parent==null)?0:parent.depth+1;
-    teamnode.signedparent = false;
-    if ( parent != null )
+    teamnode.parent = parentnode;
+    teamnode.parentkeyid = (parentnode==null)?key.getKeyID():parentnode.keyid;
+    teamnode.depth = (parentnode==null)?0:parentnode.depth+1;
+    if ( parentnode != null )
     {
-      Iterator<PGPSignature> sigit = parent.publickey.getSignaturesForKeyID( teamnode.keyid );
-      while ( sigit.hasNext() )
+      // is parent signed by this node?
+      teamnode.signedparent.searched=true;
+      sigit = parentnode.publickey.getSignaturesForKeyID( teamnode.keyid );
+      if ( sigit.hasNext() )
       {
-        PGPSignature sig = sigit.next();
-        if ( true )  // TODO validate the signature
-        {
-          teamnode.signedparent = true;
-          break;
-        }
+        teamnode.signedparent.signed = true;
+        teamnode.signedparent.sig = sigit.next();
+        teamnode.signedparent.signedkey = parentnode.publickey;
+        teamnode.signedparent.signerkey = teamnode.publickey;
+      }
+      // is this node signed by parent?
+      teamnode.signedbyparent.searched=true;
+      sigit = teamnode.publickey.getSignaturesForKeyID( parentnode.keyid );
+      if ( sigit.hasNext() )
+      {
+        teamnode.signedbyparent.signed = true;
+        teamnode.signedbyparent.sig = sigit.next();
+        teamnode.signedbyparent.signedkey = teamnode.publickey;
+        teamnode.signedbyparent.signerkey = parentnode.publickey;
+      }
+    }
+
+    teamnode.signedpersonally.searched = true;
+    PGPPublicKey personalcopy = personalkeyfinder.findPublicKey( teamnode.keyid );
+    if ( personalcopy != null && Arrays.areEqual( personalcopy.getFingerprint(), teamnode.publickey.getFingerprint() ))
+    {
+      PGPPublicKey personalsigner = personalkeyfinder.getSecretKeyForSigning().getPublicKey();
+      sigit = personalcopy.getSignaturesForKeyID( personalsigner.getKeyID() );
+      if ( sigit.hasNext() )
+      {
+        teamnode.signedpersonally.signed = true;
+        teamnode.signedpersonally.sig = sigit.next();
+        teamnode.signedpersonally.signedkey = personalcopy;
+        teamnode.signedpersonally.signerkey = personalsigner;
       }
     }
     
     nodesbyid.put(teamnode.keyid, teamnode);
-    if ( parent != null )
-      parent.childnodes.add(teamnode);
+    if ( parentnode != null )
+      parentnode.childnodes.add(teamnode);
     else
       rootteamnode = teamnode;
     
     return teamnode;
+  }
+  
+  class SignatureStatus
+  {
+    boolean searched=false;
+    boolean signed=false;
+    PGPSignature sig = null;
+    PGPPublicKey signedkey = null;
+    PGPPublicKey signerkey = null;
+    TrustContextReport report;
   }
   
   class TeamNode implements TreeNode
@@ -391,7 +513,10 @@ public class TeamKeyStore extends CompositeFileKeyStore
     PGPPublicKey publickey;
     TeamNode parent;
     long parentkeyid;
-    boolean signedparent;
+    
+    SignatureStatus signedparent     = new SignatureStatus();
+    SignatureStatus signedbyparent   = new SignatureStatus();
+    SignatureStatus signedpersonally = new SignatureStatus();
     
     String name=null;
     

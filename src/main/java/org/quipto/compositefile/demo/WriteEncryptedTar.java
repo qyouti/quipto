@@ -46,9 +46,9 @@ public class WriteEncryptedTar
   
   /**
    * 
-   * @param alias
+   * @param user
+   * @param addusers
    * @param passhandler
-   * @param addalias
    * @param addpermission
    * @param entrynames
    * @param big
