@@ -307,21 +307,13 @@ public class EncryptedCompositeFile
       if ( b < 0 )
         i = new Integer(0);
       else
-        return i = new Integer(b);
+        i = new Integer(b);
     }
     catch (IOException ex)
     {
       Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
       i = new Integer(0);
     }
-    
-//    try ( InputStream in = getDecryptingInputStream(name,true) )
-//    {
-//    }
-//    catch (IOException ex)
-//    {
-//      Logger.getLogger(EncryptedCompositeFile.class.getName()).log(Level.SEVERE, null, ex);
-//    }
     
     permissiontable.put(name, i);
     return i.intValue();
@@ -748,6 +740,7 @@ public class EncryptedCompositeFile
    */
   private  synchronized InputStream getDecryptingInputStream( String name, boolean permission ) throws IOException
   {
+    //System.out.println( "Reading     " + name  + "   from    " + getCanonicalPath() );
     if ( eu.getPassPhraseStatus(getCanonicalPath()) != PASS_KNOWN )
       throw new IOException("The file is encrypted but not for the key that was just presented.");
     char[] passphrase = eu.getPassPhrase(getCanonicalPath());
@@ -767,7 +760,9 @@ public class EncryptedCompositeFile
       }
     }
     
+    //System.out.println( "Reading data    " + name  + "   from    " + getCanonicalPath() );
     EncryptedInputWrapper inputwrapper = new EncryptedInputWrapper();
+    inputwrapper.name = name;
     try ( InputStream  tarin = super.getInputStream(name) )
     {
       inputwrapper.tarin = tarin;
@@ -1086,6 +1081,7 @@ public class EncryptedCompositeFile
   class EncryptedInputWrapper
           extends InputStream
   {
+    String name;
     InputStream literalin;
     InputStream clearin;
     InputStream tarin;
@@ -1118,8 +1114,22 @@ public class EncryptedCompositeFile
     @Override
     public void close() throws IOException
     {
+      //System.out.println( "Closing " + name + "   from " + getCanonicalPath() );
       if ( closed ) return;
       closed = true;
+      
+      byte[] dustbinbuffer = new byte[1024];
+      int n;
+      // eat data to the end of the literal data block
+      // if this isn't done we won't be lined up to 
+      // read pgpobjects after...
+      do
+      {
+        n = this.read(dustbinbuffer);
+      }
+      while ( n >= 0 );  
+      
+      
       if (pbe.isIntegrityProtected())
       {
         try
@@ -1141,7 +1151,9 @@ public class EncryptedCompositeFile
       }
       closeInputStream();
       literalin.close();
-
+      
+      long pos = getRandomAccessFilePosition();
+      //System.out.println( "position = " + pos );
       if ( !ignoresignatures && onepasssignature != null )
       {
         Object o = pgpobjectfactory.nextObject();
@@ -1177,14 +1189,15 @@ public class EncryptedCompositeFile
     @Override
     public long skip(long n) throws IOException
     {
-      return literalin.skip(n);
+      throw new IOException( "Skip not implemented.");
+      //return literalin.skip(n);
     }
 
     @Override
     public int read(byte[] b, int off, int len) throws IOException
     {
       int n = literalin.read(b, off, len);
-      if ( onepasssignature != null )
+      if ( onepasssignature != null && n>0 )
       {
         onepasssignature.update(b, off, n);
         sigcount+=n;
@@ -1196,7 +1209,7 @@ public class EncryptedCompositeFile
     public int read(byte[] b) throws IOException
     {
       int n = literalin.read(b);
-      if ( onepasssignature != null )
+      if ( onepasssignature != null && n>0 )
       {
         onepasssignature.update(b, 0, n);
         sigcount+=n;

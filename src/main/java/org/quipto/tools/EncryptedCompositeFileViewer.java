@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.security.Security;
+import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.DefaultListModel;
@@ -314,12 +315,17 @@ public class EncryptedCompositeFileViewer
       compfile = new EncryptedCompositeFile( file, false, true );
       compfile.setUser( euser );
 
-      listmodel.clear();
+      ArrayList<String> list = new ArrayList<>();
       for ( String name : compfile.getComponentNames() )
       {
         if ( !name.startsWith(".encryption") )
-          listmodel.addElement(name);
+          list.add(name);
       }
+      list.sort( String.CASE_INSENSITIVE_ORDER );
+
+      listmodel.clear();
+      for ( String name : list )
+        listmodel.addElement(name);
     }
     catch ( Exception e )
     {
@@ -346,9 +352,11 @@ public class EncryptedCompositeFileViewer
       return;
     
     StringBuilder builder = new StringBuilder();
-    try ( InputStreamReader reader = new InputStreamReader( compfile.getDecryptingInputStream(value), "UTF-8" ) )
+    InputStreamReader reader=null;
+    try
     {
       int c;
+      reader = new InputStreamReader( compfile.getDecryptingInputStream(value), "UTF-8" );
       while ( (c = reader.read()) >= 0 )
       {
         builder.append((char)c);
@@ -358,6 +366,18 @@ public class EncryptedCompositeFileViewer
     {
       Logger.getLogger(EncryptedCompositeFileViewer.class.getName()).log(Level.SEVERE, null, ex);
       JOptionPane.showMessageDialog( rootPane, "Technical problem attempting to read encrypted entry: " + ex.getMessage() );
+    }
+    finally
+    {
+      try
+      {
+        reader.close();
+      }
+      catch (Exception ex)
+      {
+        JOptionPane.showMessageDialog( rootPane, "Technical problem attempting to read to end of encrypted entry: " + ex.getMessage() );
+        Logger.getLogger(EncryptedCompositeFileViewer.class.getName()).log(Level.SEVERE, null, ex);
+      }
     }
     contenttextarea.append( builder.toString() );
     

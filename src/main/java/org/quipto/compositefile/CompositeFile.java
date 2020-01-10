@@ -82,7 +82,7 @@ public class CompositeFile implements AutoCloseable
         // Attempt read/write access first
         try
         {
-          raf = new RandomAccessFile( file, "rwd" );
+          raf = new RandomAccessFile( file, "rw" );
         }
         catch ( FileNotFoundException fnfe )
         {
@@ -115,7 +115,7 @@ public class CompositeFile implements AutoCloseable
           {
               raf.write( zeroblock );
               raf.write( zeroblock );
-              raf.seek(0);
+              setRandomAccessFilePosition(0);
               newlycreated = true;
           }
         }
@@ -129,6 +129,25 @@ public class CompositeFile implements AutoCloseable
         readComponentMap();
     }
 
+    protected long getRandomAccessFilePosition()
+    {
+      try
+      {
+        if ( raf != null )
+          return raf.getFilePointer();
+      }
+      catch (IOException ex) {
+        Logger.getLogger(CompositeFile.class.getName()).log(Level.SEVERE, null, ex);
+      }
+      return -1L;
+    }
+
+    private void setRandomAccessFilePosition( long pos ) throws IOException
+    {
+      //System.out.println( "SEEKING TO " + pos + "    in   " + this.getCanonicalPath() );
+      raf.seek(pos);
+    }
+    
     public boolean isNewlyCreated()
     {
       return newlycreated;
@@ -187,7 +206,7 @@ public class CompositeFile implements AutoCloseable
     private void readComponentMap() throws IOException
     {
         componentmap.clear();
-        raf.seek(0L);
+        setRandomAccessFilePosition(0L);
         RandomInputStream ris = new RandomInputStream( raf );
         TarArchiveInputStream tis = new TarArchiveInputStream( ris );
         TarArchiveEntry entry;
@@ -257,7 +276,7 @@ public class CompositeFile implements AutoCloseable
         ComponentEntry entry=componentmap.get( name );
         if ( entry==null )
             throw new IOException( "Component not found in CompositeFile " + name );
-        raf.seek( entry.pos );
+        setRandomAccessFilePosition( entry.pos );
         RandomInputStream ris = new RandomInputStream( raf );
         TarArchiveInputStream tis = new TarArchiveInputStream( ris );
         tis.getNextTarEntry();
@@ -299,7 +318,7 @@ public class CompositeFile implements AutoCloseable
         newentry = new ComponentEntry( nextnewentry, new TarArchiveEntry( name ) );    
         newentry.tararchiveentry.setSize(TarConstants.MAXSIZE);
 
-        raf.seek( newentry.pos );
+        setRandomAccessFilePosition( newentry.pos );
         RandomOutputStream ros = new RandomOutputStream( raf );
         tos = new SeekableTarArchiveOutputStream( ros );
         tos.putArchiveEntry(newentry.tararchiveentry);
@@ -333,7 +352,7 @@ public class CompositeFile implements AutoCloseable
         
         // now update the header with correct size
         newentry.tararchiveentry.setSize(size);
-        raf.seek( newentry.pos );
+        setRandomAccessFilePosition( newentry.pos );
         RandomOutputStream ros = new RandomOutputStream( raf );
         tos = new SeekableTarArchiveOutputStream( ros );
         tos.putArchiveEntry( newentry.tararchiveentry );
