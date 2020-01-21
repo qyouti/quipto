@@ -6,6 +6,7 @@
 package org.quipto.tools;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -91,7 +92,9 @@ public class EncryptedCompositeFileViewer
     openkeyringmenuitem = new javax.swing.JMenuItem();
     openteammenutiem = new javax.swing.JMenuItem();
     openmenuitem = new javax.swing.JMenuItem();
+    jSeparator2 = new javax.swing.JPopupMenu.Separator();
     extractentrymenuitem = new javax.swing.JMenuItem();
+    addentrymenuitem = new javax.swing.JMenuItem();
     jSeparator1 = new javax.swing.JPopupMenu.Separator();
     exitmenuitem = new javax.swing.JMenuItem();
 
@@ -189,6 +192,7 @@ public class EncryptedCompositeFileViewer
       }
     });
     jMenu1.add(openmenuitem);
+    jMenu1.add(jSeparator2);
 
     extractentrymenuitem.setText("Extract Entry...");
     extractentrymenuitem.addActionListener(new java.awt.event.ActionListener()
@@ -199,6 +203,16 @@ public class EncryptedCompositeFileViewer
       }
     });
     jMenu1.add(extractentrymenuitem);
+
+    addentrymenuitem.setText("Add Entry...");
+    addentrymenuitem.addActionListener(new java.awt.event.ActionListener()
+    {
+      public void actionPerformed(java.awt.event.ActionEvent evt)
+      {
+        addentrymenuitemActionPerformed(evt);
+      }
+    });
+    jMenu1.add(addentrymenuitem);
     jMenu1.add(jSeparator1);
 
     exitmenuitem.setText("Exit");
@@ -285,6 +299,22 @@ public class EncryptedCompositeFileViewer
     
   }//GEN-LAST:event_openkeyringmenuitemActionPerformed
 
+  
+  private void updatelist()
+  {
+      ArrayList<String> list = new ArrayList<>();
+      for ( String name : compfile.getComponentNames() )
+      {
+        if ( !name.startsWith(".encryption") )
+          list.add(name);
+      }
+      list.sort( String.CASE_INSENSITIVE_ORDER );
+
+      listmodel.clear();
+      for ( String name : list )
+        listmodel.addElement(name);
+  }
+  
   private void openmenuitemActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_openmenuitemActionPerformed
   {//GEN-HEADEREND:event_openmenuitemActionPerformed
 
@@ -315,17 +345,7 @@ public class EncryptedCompositeFileViewer
       compfile = new EncryptedCompositeFile( file, false, true );
       compfile.setUser( euser );
 
-      ArrayList<String> list = new ArrayList<>();
-      for ( String name : compfile.getComponentNames() )
-      {
-        if ( !name.startsWith(".encryption") )
-          list.add(name);
-      }
-      list.sort( String.CASE_INSENSITIVE_ORDER );
-
-      listmodel.clear();
-      for ( String name : list )
-        listmodel.addElement(name);
+      updatelist();
     }
     catch ( Exception e )
     {
@@ -482,6 +502,45 @@ public class EncryptedCompositeFileViewer
     dispose();
   }//GEN-LAST:event_exitmenuitemActionPerformed
 
+  private void addentrymenuitemActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_addentrymenuitemActionPerformed
+  {//GEN-HEADEREND:event_addentrymenuitemActionPerformed
+    JFileChooser fc = new JFileChooser();
+    fc.setCurrentDirectory( new File(".") );
+    fc.setDialogTitle("Select File to Add to this Archive");
+    fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
+    int result = fc.showOpenDialog( this );
+    if ( result != JFileChooser.APPROVE_OPTION )
+      return;
+    
+    File source = fc.getSelectedFile();
+    if ( source == null )
+      return;
+    if ( !source.isFile() )
+    {
+      JOptionPane.showMessageDialog(rootPane, "The selection is not a file.");
+      return;
+    }
+
+    String name = JOptionPane.showInputDialog( ("Please enter the name you want " + source + " to have in the archive."), source.getName() );
+    if ( name == null || name.trim().length() == 0 )
+      return;
+    
+    
+    try ( 
+            OutputStream out = compfile.getEncryptingOutputStream( name, true, true );
+            InputStream in = new FileInputStream( source );
+        )
+    {
+      Streams.pipeAll(in, out);
+    }
+    catch (IOException ex)
+    {
+      Logger.getLogger(EncryptedCompositeFileViewer.class.getName()).log(Level.SEVERE, null, ex);
+      JOptionPane.showMessageDialog( rootPane, "Technical problem attempting to add file: " + ex.getMessage() );
+    }
+
+  }//GEN-LAST:event_addentrymenuitemActionPerformed
+
   /**
    * @param args the command line arguments
    */
@@ -534,6 +593,7 @@ public class EncryptedCompositeFileViewer
   }
 
   // Variables declaration - do not modify//GEN-BEGIN:variables
+  private javax.swing.JMenuItem addentrymenuitem;
   private javax.swing.JLabel aliaslabel;
   private javax.swing.JTextArea contenttextarea;
   private javax.swing.JLabel datastorelabel;
@@ -552,6 +612,7 @@ public class EncryptedCompositeFileViewer
   private javax.swing.JScrollPane jScrollPane1;
   private javax.swing.JScrollPane jScrollPane2;
   private javax.swing.JPopupMenu.Separator jSeparator1;
+  private javax.swing.JPopupMenu.Separator jSeparator2;
   private javax.swing.JSplitPane jSplitPane1;
   private javax.swing.JLabel keystorelabel;
   private javax.swing.JMenuItem openkeyringmenuitem;
